@@ -5,7 +5,7 @@ txdir(1) Version 1.0.0 \| txdir
 NAME
 ====
 
-**txdir** — text tree for or to file tree
+**txdir** — text tree from or to file tree
 
 SYNOPSIS
 ========

@@ -1,15 +1,27 @@
+#!/usr/bin/env python
+
 from setuptools import setup
+import os
+from os.path import dirname
+import ast
+import re
 
+here = os.path.abspath(os.path.dirname(__file__))
+os.chdir(here)
 
-with open("README.rst") as f:
-    readme = f.read()
+_version_re = re.compile(r'__version__\s*=\s*(.*)')
+with open(os.path.join(here, 'txdir.py'), 'rb') as f:
+    version = str(ast.literal_eval(_version_re.search(
+        f.read().decode('utf-8')).group(1)))
 
+with open(os.path.join(here, 'README.rst'), 'rt') as f:
+    long_description = f.read()
 
 setup(
     name="txdir",
-    version="1.0.0",
+    version=version,
     description="Creating file tree from text tree and vice versa",
-    long_description=readme,
+    long_description=long_description,
     long_description_content_type='text/x-rst',
     license="MIT",
     author="Roland Puntaier",
