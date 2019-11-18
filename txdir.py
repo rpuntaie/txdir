@@ -11,7 +11,7 @@ from threading import RLock
 from urllib import request
 from tempfile import NamedTemporaryFile
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 #these can be changed from outside to use e.g. only ASCII
 MID = '├'

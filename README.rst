@@ -68,7 +68,7 @@ before being processed by M to produce the final file tree.
 
 To install for user only, do::
 
-   pip install --user stpl
+   pip install --user txdir
 
 USAGE
 =====
