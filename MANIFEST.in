@@ -1,0 +1,4 @@
+include test_txdir.py
+include LICENSE.txt
+include README.rst
+include txdir.1
