@@ -10,8 +10,9 @@ import contextlib
 from threading import RLock
 from urllib import request
 from tempfile import NamedTemporaryFile
+import pathspec
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 #these can be changed from outside to use e.g. only ASCII
 MID = '├'
@@ -53,8 +54,12 @@ def with_cwd(apth,cwd=cwd,cd=cd):
         cd(prev_cwd)
         _cdlock.release()
 def filecontent(pd):
-    with open(pd, encoding='utf-8') as f:
-        yield from f.readlines()
+    try:
+        with open(pd, encoding='utf-8') as f:
+            yield from f.readlines()
+    except UnicodeDecodeError:
+        return
+
 def filewrite(efile,cntlns):
     dexists = dirname(efile)
     if dexists and not exists(dexists):
@@ -79,6 +84,54 @@ def urlretrieve(url,tofile,filewrite=filewrite,filecontent=filecontent,eprint=ep
             filewrite(tofile,filecontent(f))
         except Exception as err:
             eprint("Error retrieving "+url+" to "+tofile+':', err)
+def up_dir(match
+           ,start
+           ,listdir=listdir
+           ,up=dirname
+           ):
+    """
+    Find a parent path producing a match on one of its entries.
+    Without match an empty string is returned.
+
+    :param match: a function returning a bool on a directory entry
+    :param start: absolute path or None
+    :return: directory with a match on one of its entries
+
+    >>> up_dir(lambda x: False,start=cwd())
+    ''
+
+    """
+
+    if any(match(x) for x in listdir(start)):
+        return start
+    parent = up(start)
+    if start == parent:
+        try:
+            rootres = start.replace('\\','/').strip('/').strip(':')
+            if len(rootres)==1 and 'win' in sys.platform: # pragma: no cover
+                rootres = ''
+            return rootres
+        except:
+            return None
+    if not parent:
+        return parent
+    return up_dir(match,start=parent)
+class GitIgnore:
+    def __init__(self
+                 ,start
+                 ,listdir=listdir
+                 ,up=dirname
+                 ,normjoin=normjoin
+                 ,filecontent=filecontent
+                 ,name=lambda x:x
+                 ):
+        self.spec = None
+        gidir = up_dir(lambda x:name(x)=='.gitignore',start=start,listdir=listdir,up=up)
+        self.name = name
+        if gidir:
+            self.spec = pathspec.PathSpec.from_lines('gitwildmatch',filecontent(normjoin(gidir,'.gitignore')))
+    def __call__(self,file):
+        return self.spec and self.spec.match_file(self.name(file))
 
 #functions
 MAXDEPTH = 30
@@ -95,6 +148,7 @@ def tree_to_view(rootpath = None
          ,filecontent=filecontent
          ,readlink=readlink
          ,name=lambda x:x
+         ,up=dirname
          ):
     """
     Returns a generator for a tree view as produced by the linux tree tool,
@@ -113,17 +167,20 @@ def tree_to_view(rootpath = None
         rootpath = cwd()
     rootdir = rootpath
     lenprefix = len(prefix_middle_end[0])
+    gitignore = GitIgnore(start=rootpath,listdir=listdir,up=up,normjoin=normjoin,filecontent=filecontent,name=name)
     def _tree(p, prefix):
         ds = listdir(p)
         lends = len(ds)
         if len(prefix)//lenprefix >= maxdepth:
             return
         for i, d in enumerate(sorted(ds)):
+            pd = normjoin(p, d)
+            if gitignore(pd):
+                continue
             dn = name(d)
             if not with_dot and dn.startswith('.'):
                 continue
             padding = prefix + prefix_middle_end[i==lends-1]
-            pd = normjoin(p, d)
             if islink(pd):
                 yield padding + dn + ' ' + LNKR + ' ' + readlink(pd)
             elif isdir(pd):
@@ -296,6 +353,7 @@ def tree_to_flat(rootpath = None
          ,filecontent=filecontent
          ,readlink=readlink
          ,name=lambda x:x
+         ,up=dirname
          ):
     """
     Returns a generator for a flat tree listing,
@@ -314,15 +372,18 @@ def tree_to_flat(rootpath = None
     if rootpath is None:
         rootpath = cwd()
     rootdir = rootpath
+    gitignore = GitIgnore(start=rootpath,listdir=listdir,up=up,normjoin=normjoin,filecontent=filecontent,name=name)
     def _tree(p, prefix):
         ds = listdir(p)
         if len(prefix) >= maxdepth:
             return
         for i, d in enumerate(sorted(ds)):
+            pd = normjoin(p, d)
+            if gitignore(pd):
+                continue
             dn = name(d)
             if not with_dot and dn.startswith('.'):
                 continue
-            pd = normjoin(p, d)
             nprefix = prefix+[dn]
             thispth = '/'.join(nprefix)
             if islink(pd):
@@ -418,7 +479,7 @@ def flat_to_tree(flat_str_list
                     x = flat_str_list[j]
                     if not x or x.startswith(' '):
                         fllns.append(x)
-                    else:
+                    else: # pragma: no cover (it is covered, but coverage says not)
                         break
                     j = j+1
                 ln0 = fllns[0]
@@ -635,12 +696,13 @@ class DirTree:
              ,with_content=with_content
              ,maxdepth=maxdepth
              ,isdir=lambda x: x.isdir()
-             ,normjoin=lambda *x: x[-1]
+             ,normjoin=lambda *x: x[-2].cd(x[-1]) if isinstance(x[-1],str) else x[-1]
              ,islink=lambda x: x.islink()
              ,listdir=lambda x: x.content
              ,filecontent=lambda x: x.content
              ,readlink=lambda x: x.content
              ,name=lambda x: x.name
+             ,up=lambda x: x.parent if x.parent else x
              )))
 
     def flat(self, pint=print):
@@ -689,7 +751,14 @@ def main(print=print,**args):
         args.setdefault('outdir','-')
         args=argparse.Namespace(**args)
     else:
-        parser = argparse.ArgumentParser(add_help=False)
+        parser = argparse.ArgumentParser(add_help=False,description='''\
+        Files/dirs are ignored via .gitignore.
+        If the directory contains unignored binary files, exclude files with '-f'.
+        Ignoring content with '-n', then reapplying will empty all files.
+        NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY ACCORDING FILES IN THE FILE TREE.
+        Text file content must not have an empty first line.
+        '''
+        )
         parser.add_argument("-h", action="help", help="Print help information.")
         parser.add_argument(
             "-v",
@@ -808,3 +877,4 @@ def main(print=print,**args):
 if __name__ == "__main__":
     raise SystemExit(main())
 
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4.

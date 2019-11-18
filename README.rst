@@ -12,6 +12,7 @@ SYNOPSIS
 
 **txdir** [<infile>\|<indir>\|-] [<outdir>\|-] [<options>]
 
+
 Options::
 
     -h: help
@@ -19,14 +20,21 @@ Options::
     -l: flat listing
     -f: exclude files
     -d: include dot files/directories
-    -n: exclude file content
+    -n: exclude file content (don't reapply such a tree as it will empty all files)
     -m: maximum depth
     -c: commands to create directories (from https://github.com/gcmt/mktree)
 
+Files/dirs are ignored via .gitignore.
+
 Command line help::
 
-    usage: txdir [infile] [outdir] [-h] [-v] [-l] [-f] [-d] [-w] [-m M] [-c [C [C ...]]]
+    usage: txdir [infile] [outdir] [-h] [-v] [-l] [-f] [-d] [-n] [-m M] [-c [C [C ...]]]
 
+    Files/dirs are ignored via .gitignore. If the directory contains unignored
+    binary files, exclude files with '-f'. Ignoring content with '-n', then
+    reapplying will empty all files. NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY
+    ACCORDING FILES IN THE FILE TREE.
+    
     positional arguments:
       infile          If a file, it is expected to contain a text tree, flat or
                       indented (none or - is stdin). If a directory, the text tree
@@ -35,7 +43,7 @@ Command line help::
                       parameter is an existing file, nothing is done. If not a
                       directory, the directory is created. The file tree is
                       created in the directory.
-
+    
     optional arguments:
       -h              Print help information.
       -v              Print version information.
@@ -77,35 +85,49 @@ Without arguments it expects input from ``stdin``::
 
     txdir
 
-Used on a directory tree,
-where non-text files are only in dotted directories (e.g. .git)::
+Exit this via ``CTRL+C``.
+Use no input argument in combination piping, or when using `-c`.
+
+Use on a directory tree where
+
+- binary text files are only in dotted directories (e.g. .git) or
+- binary files are ignored via ``.gitignore``
+
+::
 
     txdir .
 
-it produces one text output to ``stdout``, similar to ``tree``, but with content (unless with ``-n``).
+It produces text output to ``stdout``, similar to ``tree``, but with content,
+unless content is suppressed with ``-n``.
 
 You can save the output in a file and edit it::
 
     txdir -l . > thisdir.txt
 
-The ``-l`` option make the output flat to distinguish what is content and what is tree.
-Don't worry, you can drop the ``-l``, 
+The ``-l`` option makes the output flat to distinguish what is content and what is tree.
+Don't worry, you can also drop the ``-l``,
 as ``txdir . | txdir - .`` does not create the same tree below ``thisdir.txt``,
-because ``thisdir.txt`` exists as file already.
+because ``thisdir.txt`` exists as file and not as directory.
 
-No directory is created unless a root directory is provided::
+No directory is created unless a root directory is provided as second argument::
+
+    txdir thisdir.txt .
+
+This applies the (edited) text tree in ``thisdir.txt`` on the current directory.
+
+::
 
     txdir . again
 
-This produces the same tree below ``again``, almost like a ``cp -R``.
+This produces the same tree below ``again``, almost like a ``cp -R . again``.
 But internally a text tree of the file tree is created and then applied to the new location.
 
-**It does not work for binary files**. If there are binary files, use ``-f`` to exclude files.
-Note, also, **the text files must not have an empty first line**.
+``txdir`` **does not work for binary files**. If there are binary files, use ``-f`` to exclude files.
+Ignoring content with '-n', then reapplying will empty all files.
 
-After editing the file you can apply it on the tree again::
+NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY ACCORDING FILES IN THE FILE TREE.
 
-    txdir thisdir.txt .
+Note, also, that **text file content must not have an empty first line**.
 
 License
 -------

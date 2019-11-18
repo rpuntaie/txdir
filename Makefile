@@ -6,12 +6,13 @@ test:
 man:
 	pandoc README.rst -s -t man -o txdir.1
 
-dist:
+check:
+	restview --long-description --strict
+
+dist: man
 	sudo python setup.py bdist_wheel
 
 up:
 	twine upload dist/`ls dist -rt | tail -1`
 
-check:
-	restview --long-description --strict
 

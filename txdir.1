@@ -4,7 +4,7 @@
 .hy
 .SH NAME
 .PP
-\f[B]txdir\f[R] \[em] text tree for or to file tree
+\f[B]txdir\f[R] \[em] text tree from or to file tree
 .SH SYNOPSIS
 .PP
 \f[B]txdir\f[R] [<infile>|<indir>|-] [<outdir>|-] [<options>]
@@ -18,17 +18,24 @@ Options:
 -l: flat listing
 -f: exclude files
 -d: include dot files/directories
--n: exclude file content
+-n: exclude file content (don\[aq]t reapply such a tree as it will empty all files)
 -m: maximum depth
 -c: commands to create directories (from https://github.com/gcmt/mktree)
 \f[R]
 .fi
 .PP
+Files/dirs are ignored via .gitignore.
+.PP
 Command line help:
 .IP
 .nf
 \f[C]
-usage: txdir [infile] [outdir] [-h] [-v] [-l] [-f] [-d] [-w] [-m M] [-c [C [C ...]]]
+usage: txdir [infile] [outdir] [-h] [-v] [-l] [-f] [-d] [-n] [-m M] [-c [C [C ...]]]
+
+Files/dirs are ignored via .gitignore. If the directory contains unignored
+binary files, exclude files with \[aq]-f\[aq]. Ignoring content with \[aq]-n\[aq], then
+reapplying will empty all files. NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY
+ACCORDING FILES IN THE FILE TREE.
 
 positional arguments:
   infile          If a file, it is expected to contain a text tree, flat or
@@ -74,7 +81,7 @@ To install for user only, do:
 .IP
 .nf
 \f[C]
-pip install --user stpl
+pip install --user txdir
 \f[R]
 .fi
 .SH USAGE
@@ -87,9 +94,15 @@ txdir
 \f[R]
 .fi
 .PP
-Used on a directory tree, where non-text files are only in dotted
-directories (e.g.
-\&.git):
+Exit this via \f[C]CTRL+C\f[R].
+Use no input argument in combination piping, or when using -c.
+.PP
+Use on a directory tree where
+.IP \[bu] 2
+binary text files are only in dotted directories (e.g.
+\&.git) or
+.IP \[bu] 2
+binary files are ignored via \f[C].gitignore\f[R]
 .IP
 .nf
 \f[C]
@@ -97,8 +110,8 @@ txdir .
 \f[R]
 .fi
 .PP
-it produces one text output to \f[C]stdout\f[R], similar to
-\f[C]tree\f[R], but with content (unless with \f[C]-n\f[R]).
+It produces text output to \f[C]stdout\f[R], similar to \f[C]tree\f[R],
+but with content, unless content is suppressed with \f[C]-n\f[R].
 .PP
 You can save the output in a file and edit it:
 .IP
@@ -108,14 +121,24 @@ txdir -l . > thisdir.txt
 \f[R]
 .fi
 .PP
-The \f[C]-l\f[R] option make the output flat to distinguish what is
+The \f[C]-l\f[R] option makes the output flat to distinguish what is
 content and what is tree.
-Don\[aq]t worry, you can drop the \f[C]-l\f[R], as
+Don\[aq]t worry, you can also drop the \f[C]-l\f[R], as
 \f[C]txdir . | txdir - .\f[R] does not create the same tree below
-\f[C]thisdir.txt\f[R], because \f[C]thisdir.txt\f[R] exists as file
-already.
+\f[C]thisdir.txt\f[R], because \f[C]thisdir.txt\f[R] exists as file and
+not as directory.
 .PP
-No directory is created unless a root directory is provided:
+No directory is created unless a root directory is provided as second
+argument:
+.IP
+.nf
+\f[C]
+txdir thisdir.txt .
+\f[R]
+.fi
+.PP
+This applies the (edited) text tree in \f[C]thisdir.txt\f[R] on the
+current directory.
 .IP
 .nf
 \f[C]
@@ -124,21 +147,20 @@ txdir . again
 .fi
 .PP
 This produces the same tree below \f[C]again\f[R], almost like a
-\f[C]cp -R\f[R].
+\f[C]cp -R . again\f[R].
 But internally a text tree of the file tree is created and then applied
 to the new location.
 .PP
-\f[B]It does not work for binary files\f[R].
+\f[C]txdir\f[R] \f[B]does not work for binary files\f[R].
 If there are binary files, use \f[C]-f\f[R] to exclude files.
-Note, also, \f[B]the text files must not have an empty first line\f[R].
+Ignoring content with \[aq]-n\[aq], then reapplying will empty all
+files.
 .PP
-After editing the file you can apply it on the tree again:
-.IP
-.nf
-\f[C]
-txdir thisdir.txt .
-\f[R]
-.fi
+NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY ACCORDING FILES IN THE FILE
+TREE.
+.PP
+Note, also, that \f[B]text file content must not have an empty first
+line\f[R].
 .SS License
 .PP
 MIT

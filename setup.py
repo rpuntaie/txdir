@@ -29,6 +29,7 @@ setup(
     url="https://github.com/rpuntaie/txdir",
     py_modules=["txdir"],
     data_files=[("man/man1", ["txdir.1"])],
+    install_requires=['pathspec'],
     python_requires='>=3.6',
     classifiers=[
         "Development Status :: 4 - Beta",

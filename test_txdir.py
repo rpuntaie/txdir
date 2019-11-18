@@ -400,3 +400,53 @@ def test_err2(tmpworkdir,capsys):
     assert captured.err.startswith('Error')
     assert not os.path.exists('tmpt/a/b')
 
+def test_err3(tmpworkdir):
+    import random
+    with open('tmp','wb') as f:
+       f.write(b'\xff') #UnicodeDecodeError
+    lns = '\n'.join(txdir.tree_to_view('.'))
+    assert lns == "└─ tmp"
+
+
+def test_git(tmpworkdir):
+    shutil.copy2(f"{here}/.gitignore",os.path.join(tmpworkdir,'.gitignore'))
+    ignoren = 'build'
+    os.makedirs(ignoren)
+    with open(ignoren+'/x.txt','w') as f:
+       f.write('Just a test')
+    os.makedirs(ignoren+'X')
+    with open(ignoren+'X/x.txt','w') as f:
+       f.write('Yet Another Test')
+    os.makedirs(ignoren+'Y')
+    with open(ignoren+'Y/x.txt','w') as f:
+       f.write('Yet Another Test')
+    lns = '\n'.join(txdir.tree_to_view('.'))
+    assert 'Just a test' not in lns
+    assert 'Yet Another Test' in lns
+    lns = '\n'.join(txdir.tree_to_flat('.'))
+    assert 'Just a test' not in lns
+    assert 'Yet Another Test' in lns
+    txdir.flat_to_tree(lns.splitlines())
+
+
+def test_empty(tmpworkdir):
+    lst = '''\
+t/a/aa.txt
+    this is aa
+    this is aa
+t/b/bb.txt
+    this is bb
+    this is bb
+'''.splitlines()
+    txdir.flat_to_tree(lst)
+    assert os.path.exists('t/a/aa.txt')
+    assert os.path.exists('t/b/bb.txt')
+    assert os.stat('t/a/aa.txt').st_size>0
+    assert os.stat('t/b/bb.txt').st_size>0
+    v = '\n'.join(txdir.tree_to_view(with_content=False))
+    txdir.view_to_tree(v.splitlines())
+    assert os.path.exists('t/a/aa.txt')
+    assert os.path.exists('t/b/bb.txt')
+    assert os.stat('t/a/aa.txt').st_size==0
+    assert os.stat('t/b/bb.txt').st_size==0
+

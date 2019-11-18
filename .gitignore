@@ -1,10 +1,10 @@
-__pycache__/
+__pycache__
+dist
+build
+
 *.pyc
 *.egg-info
 
-dist/
-build/
-
-.tags/
 .tags
+
 .coverage
