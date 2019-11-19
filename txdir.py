@@ -35,7 +35,7 @@ def set_tree_chars(
         ,dwn = '<<'
         ,mid_end = ['├─ ','└─ ']
         ,sub_mid_end = ['│  ', '   ']
-    ):
+): # pragma: no cover
     global MID
     global END
     global HOR
@@ -55,7 +55,7 @@ def set_tree_chars(
     MID_END     = mid_end
     SUB_MID_END = sub_mid_end
 
-if 'win' in sys.platform:
+if 'win' in sys.platform: # pragma: no cover
    set_tree_chars(
         mid = r"`"
         ,end = "`"
