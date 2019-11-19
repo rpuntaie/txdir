@@ -55,17 +55,6 @@ def set_tree_chars(
     MID_END     = mid_end
     SUB_MID_END = sub_mid_end
 
-if 'win' in sys.platform: # pragma: no cover
-   set_tree_chars(
-        mid = r"`"
-        ,end = "`"
-        ,hor = "-"
-        ,ver = r"|"
-        ,mid_end =     ['`- ', '`- ']
-        ,sub_mid_end = ['|  ', '   ']
-   )
-
-
 #OS
 cwd = lambda: os.getcwd().replace('\\', '/')
 cd = os.chdir
@@ -762,7 +751,7 @@ class TxDir:
 def main(print=print,**args):
     """Command line functionality."""
     if args:
-        for x in 'vlfdn':
+        for x in 'valfdn':
             args.setdefault(x,False)
         args.setdefault('m',MAXDEPTH)
         args.setdefault('c',[])
@@ -784,6 +773,11 @@ def main(print=print,**args):
             action="version",
             version=f"%(prog)s {__version__}",
             help="Print version information.",
+        )
+        parser.add_argument(
+            "-a",
+            action="store_true",
+            help="Use ASCII instead of unicode when printint the text tree.",
         )
         parser.add_argument(
             "-l",
@@ -852,15 +846,30 @@ def main(print=print,**args):
     maxdepth     = args.m
     trees        = args.c
 
+    if args.a:
+        set_tree_chars(
+             mid = r"`"
+             ,end = "`"
+             ,hor = "-"
+             ,ver = r"|"
+             ,mid_end =     ['`- ', '`- ']
+             ,sub_mid_end = ['|  ', '   ']
+        )
+
     dirtree = None
     if trees:
         dirtree = TxDir.fromcmds(trees)
 
+    try:
+        sys.stdin = codecs.getreader("utf-8")(sys.stdin.detach())
+        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+        sys.stderr = codecs.getreader("utf-8")(sys.stderr.detach())
+    except:
+        pass
     fview = []
     inf = isfile(infile)
     if not inf and infile == '-':
         if not trees:
-            sys.stdin = codecs.getreader("utf-8")(sys.stdin.detach())
             fview = [x.rstrip() for x in sys.stdin.readlines()]
     elif inf:
         with open(infile,'r',encoding='utf-8') as f:
@@ -880,7 +889,6 @@ def main(print=print,**args):
                              ,with_content=with_content
                              ,maxdepth=maxdepth
                                   ))
-
     outf = isfile(outdir)
     if not outf:
         if outdir == '-':
@@ -897,4 +905,4 @@ def main(print=print,**args):
 if __name__ == "__main__":
     raise SystemExit(main())
 
-# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
+# vim: ts=4 sw=4 sts=4 et noai nocin nosi inde=

@@ -49,6 +49,7 @@ Command line help::
       -v              Print version information.
       -l              Create a flat listing instead of an indented text tree from
                       file tree.
+      -a              Use ASCII instead of unicode when printing the indented text tree.
       -f              Omit files. Just directories, when creating a text tree from
                       a file tree.
       -d              Include dot files/directories when creating a text tree from

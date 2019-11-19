@@ -19,28 +19,57 @@ txdir = importlib.machinery.SourceFileLoader("txdir", module_path).load_module()
 fromview = txdir.TxDir.fromview
 fromcmds = txdir.TxDir.fromcmds
 
+@pytest.fixture(scope="module",params=[True,False])
+def u8(request):
+    yes = request.param
+    global Z
+    global MID
+    global END
+    global VER
+    global HOR
+    if yes:
+       MID = '├'
+       END = '└'
+       HOR = '─'
+       VER = '│'
+       Z = ''
+       txcmd = f'{here}/txdir.py'
+    else:
+       Z = '-a'
+       txdir.set_tree_chars(
+            mid = r"`"
+            ,end = "`"
+            ,hor = "-"
+            ,ver = r"|"
+            ,mid_end =     ['`- ', '`- ']
+            ,sub_mid_end = ['|  ', '   ']
+       )
+       MID = r"`"
+       END = "`"
+       VER = "|"
+       HOR = "-"
+
 if 'win' in sys.platform:
-   txdir.set_tree_chars(
-        mid = r"`"
-        ,end = "`"
-        ,hor = "-"
-        ,ver = r"|"
-        ,mid_end =     ['`- ', '`- ']
-        ,sub_mid_end = ['|  ', '   ']
-   )
-   MID = r"`"
-   END = "`"
-   VER = "|"
-   HOR = "-"
+   ##Z = ''
+   #Z = '-a'
+   #txdir.set_tree_chars(
+   #     mid = r"`"
+   #     ,end = "`"
+   #     ,hor = "-"
+   #     ,ver = r"|"
+   #     ,mid_end =     ['`- ', '`- ']
+   #     ,sub_mid_end = ['|  ', '   ']
+   #)
+   #MID = r"`"
+   #END = "`"
+   #VER = "|"
+   #HOR = "-"
    txcmd = f'{here}\\txdir.py'
 else:
-   MID = '├'
-   END = '└'
-   HOR = '─'
-   VER = '│'
+   #Z = ''
    txcmd = f'{here}/txdir.py'
 
-def test_tree_parsing():
+def test_tree_parsing(u8):
 
     def eqpth(a, b):
         assert set(x.path() for x in a) == set(b)
@@ -68,9 +97,9 @@ def test_tree_parsing():
     eqpth(fromcmds([r"foo\\\bar,baz"]), [r"foo\bar", "baz"])
     eqpth(fromcmds([r"foo\\\\bar,baz"]), [r"foo\\bar", "baz"])
 
-def test_cmd_help():
+def test_cmd_help(u8):
     r = run([txcmd,'-h'],stdout=PIPE)
-    lns = r.stdout.decode()
+    lns = r.stdout.decode('utf-8')
     assert r.returncode == 0
     assert '-h' in lns
     assert '-v' in lns
@@ -81,22 +110,22 @@ def test_cmd_help():
     assert '-m' in lns
     assert '-c' in lns
 
-def test_cmd_flatlist():
-    r = run([txcmd,'-l','-c','a/b'],stdout=PIPE)
+def test_cmd_flatlist(u8):
+    r = run([txcmd,'-l','-c','a/b']+([Z]if Z else[]),stdout=PIPE)
     assert r.returncode == 0
-    lns = r.stdout.decode()
+    lns = r.stdout.decode('utf-8')
     assert 'a/b/' == lns.strip()
 
-def test_cmd_treelist():
-    r = run([txcmd,'-c','a/b'],stdout=PIPE)
+def test_cmd_treelist(u8):
+    r = run([txcmd,'-c','a/b']+([Z]if Z else[]),stdout=PIPE)
     assert r.returncode == 0
-    lns = r.stdout.decode()
+    lns = r.stdout.decode('utf-8')
     assert '└─ b'.replace('─',HOR).replace('└',END) in lns.strip()
 
-def test_cmd_v():
-    r = run([txcmd,'-v','a/b'],stdout=PIPE)
+def test_cmd_v(u8):
+    r = run([txcmd,'-v','a/b']+([Z]if Z else[]),stdout=PIPE)
     assert r.returncode == 0
-    lns = r.stdout.decode()
+    lns = r.stdout.decode('utf-8')
     assert 'txdir' in lns.strip()
 
 @pytest.yield_fixture
@@ -109,69 +138,71 @@ def tmpworkdir(tmpdir):
     yield tmpdir
     os.chdir(cwd)
 
-def test_cmd_file1(tmpworkdir):
-    r = sprun("echo a | "+txcmd+" - .",shell=True)
+def test_cmd_file1(tmpworkdir,u8):
+    r = sprun("echo a | "+txcmd+" "+Z+" - .",shell=True)
     assert r.returncode == 0
     assert os.path.exists('a')
     with pytest.raises(NotADirectoryError):
         shutil.rmtree('a')
 
-def test_cmd_dir1(tmpworkdir):
-    r = sprun(f"echo a/ | "+txcmd+" - .",shell=True)
+def test_cmd_dir1(tmpworkdir,u8):
+    r = sprun(f"echo a/ | "+txcmd+" "+Z+" - .",shell=True)
     assert r.returncode == 0
     assert os.path.exists('a')
     shutil.rmtree('a')
 
 @pytest.yield_fixture
 def b_with_a(tmpworkdir):
-    r = sprun(f"echo a/ | "+txcmd+" - b",shell=True)
+    r = sprun(f"echo a/ | "+txcmd+" "+Z+" - b",shell=True)
     assert r.returncode == 0
     assert os.path.exists('b/a')
     assert os.path.isdir('b/a')
     yield r
     shutil.rmtree('b')
 
-def test_cmd_cpdir(b_with_a,capsys):
-    r = run([txcmd,'b','c'])
+def test_cmd_cp1(b_with_a,u8):
+    r = run([txcmd,'b','c']+([Z]if Z else[]))
     assert r.returncode == 0
     assert os.path.exists('c/a')
     assert os.path.isdir('c/a')
 
-def test_cmd_cpdir1(b_with_a,capsys):
-    r = run([txcmd,'.','c'])
+def test_cmd_cp2(b_with_a,u8):
+    r = run([txcmd,'.','c']+([Z]if Z else[]))
     assert r.returncode == 0
     assert os.path.exists('c/b/a')
     assert os.path.isdir('c/b/a')
 
-def test_cmd_showdir(b_with_a,capsys):
+def test_cmd_showdir(b_with_a,u8):
     buf = io.StringIO()
     txdir.main(infile='b',print=lambda *a,**ka: print(*a,file=buf,**ka))
     buf.seek(0)
     out = buf.read()
     assert '└─ a/'.replace('─',HOR).replace('└',END) in out
 
-def test_cmd_copydir(b_with_a,capsys):
-    r=sprun(txcmd +" b | "+txcmd+" - witha",shell=True)
+def test_cmd_copydir(b_with_a,u8):
+    r=sprun(txcmd+" "+Z+" b | "+txcmd+" "+Z+" - witha",shell=True)
     assert r.returncode == 0
     assert os.path.exists('witha/a')
     assert os.path.isdir('witha/a')
     shutil.rmtree('witha')
 
-def test_cmd_fromfile(b_with_a,capsys):
-    txdir.main(infile='b')
-    captured = capsys.readouterr()
-    with open('b/a/ca.txt','w') as f:
-        f.write(captured.out)
+def test_cmd_fromfile(b_with_a,u8):
+    buf = io.StringIO()
+    txdir.main(infile='b',print=lambda *a,**ka: print(*a,file=buf,**ka))
+    buf.seek(0)
+    out = buf.read()
+    with open('b/a/ca.txt','w',encoding='utf-8') as f:
+        f.write(out)
     txdir.main(infile='b/a/ca.txt',outdir='witha')
     assert os.path.exists('witha/a')
     assert os.path.isdir('witha/a')
     shutil.rmtree('witha')
 
-def test_from_view(b_with_a):
+def test_from_view(b_with_a,u8):
     v = txdir.tree_to_view()
     assert '└─ a/'.replace('─',HOR).replace('└',END) in '\n'.join(v)
 
-def test_dirtree_from_view1():
+def test_dirtree_from_view1(u8):
     v='''\
     └─ b/
         └─ a/'''.replace('─',HOR).replace('└',END)
@@ -182,7 +213,7 @@ def test_dirtree_from_view1():
     with pytest.raises(FileNotFoundError):
        d.cd('some/where')
 
-def test_dirtree_from_view2():
+def test_dirtree_from_view2(u8):
     v='''
 
           tmpt
@@ -212,7 +243,7 @@ tmpt/b/g.txt
    this is g
 '''
 
-def test_dirtree_from_view3(tmpworkdir):
+def test_dirtree_from_view3(tmpworkdir,u8):
     v='''\
 └─ tmpt/
    ├─ a/
@@ -262,26 +293,25 @@ tmpt/b/c/
 tmpt/b/e/
 tmpt/b/k/'''
 
-def test_flat1(tree):
+def test_flat1(tree,u8):
     d = txdir.TxDir.fromfs('tmpt')
     quick = d.cd('b/e/u/f.txt')
     assert quick!=None
     assert quick.isfile()
     assert len(quick.content)>100
 
-def test_flat2(tree,capsys):
-    txdir.main(infile='.',l=True,m=2)
-    captured = capsys.readouterr()
-    expected = '''\
-tmpt/a/
-tmpt/b/
-'''
-    assert captured.out == expected
-
-def test_nodot_nofile(tree):
-    r = run([txcmd,'.','-fn','-m','4'],stdout=PIPE)
+def test_flat2(tree,u8):
+    r = run([txcmd,'.','-l','-m','2'],stdout=PIPE)
     assert r.returncode == 0
-    lns = '\n'.join(r.stdout.decode().splitlines())
+    lns = '\n'.join(r.stdout.decode('utf-8').splitlines())
+    assert lns  == '''\
+tmpt/a/
+tmpt/b/'''
+
+def test_nodot_nofile(tree,u8):
+    r = run([txcmd,'.','-fn','-m','4']+([Z]if Z else[]),stdout=PIPE)
+    assert r.returncode == 0
+    lns = '\n'.join(r.stdout.decode('utf-8').splitlines())
     assert lns == '''\
 └─ tmpt/
    ├─ a/
@@ -295,10 +325,10 @@ def test_nodot_nofile(tree):
       └─ k/
          └─ e -> ../../../tmpt/a'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
 
-def test_withcontent(tree):
-    r = run([txcmd,'.','-d','-m','4'],stdout=PIPE)
+def test_withcontent(tree,u8):
+    r = run([txcmd,'.','-d','-m','4']+([Z]if Z else[]),stdout=PIPE)
     assert r.returncode == 0
-    lns = '\n'.join(r.stdout.decode().splitlines())
+    lns = '\n'.join(r.stdout.decode('utf-8').splitlines())
     assert lns == '''\
 └─ tmpt/
    ├─ a/
@@ -317,7 +347,7 @@ def test_withcontent(tree):
       │  └─ u/
       └─ k/
          └─ e -> ../../../tmpt/a'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
-def test_dirflat(tmpworkdir):
+def test_dirflat(tmpworkdir,u8):
     lst = '''\
 tmpt/a/aa.txt
     this is aa
@@ -349,10 +379,10 @@ tmpt/b/g.txt
 
 '''
 
-def test_mkdir(tmpworkdir):
+def test_mkdir(tmpworkdir,u8):
     if 'win' in sys.platform:
         return True
-    sprun(txcmd+fr" - . -c 'a/b/d.c/d..a/u,v,x,g\.x'",shell=True)
+    sprun(txcmd+" "+Z+fr" - . -c 'a/b/d.c/d..a/u,v,x,g\.x'",shell=True)
     t1 = txdir.TxDir.fromfs('a')
     shutil.rmtree('a')
     sprun('mkdir -p a/{b,c}/d a/u a/v a/x a/g.x',shell=True)
@@ -362,7 +392,7 @@ def test_mkdir(tmpworkdir):
     tt2 = t2.view()
     assert tt1 == tt2
 
-def test_err1(tmpworkdir,capsys):
+def test_err1(tmpworkdir,capsys,u8):
     v='''\
 └─ tmpt/
    ├─ a/
@@ -404,7 +434,7 @@ def test_err1(tmpworkdir,capsys):
                 NEWT'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
 
 
-def test_err2(tmpworkdir,capsys):
+def test_err2(tmpworkdir,capsys,u8):
     v='''\
 └─ tmpt/
    ├─ a/
@@ -415,7 +445,7 @@ def test_err2(tmpworkdir,capsys):
     assert captured.err.startswith('Error')
     assert not os.path.exists('tmpt/a/b')
 
-def test_err3(tmpworkdir):
+def test_err3(tmpworkdir,u8):
     import random
     with open('tmp','wb') as f:
        f.write(b'\xff') #UnicodeDecodeError
@@ -423,7 +453,7 @@ def test_err3(tmpworkdir):
     assert lns == "└─ tmp".replace('─',HOR).replace('└',END)
 
 
-def test_git1(tmpworkdir):
+def test_git1(tmpworkdir,u8):
     shutil.copy2(f"{here}/.gitignore",os.path.join(tmpworkdir,'.gitignore'))
     ignoren = 'build'
     os.makedirs(ignoren)
@@ -443,7 +473,7 @@ def test_git1(tmpworkdir):
     assert 'Yet Another Test' in lns
     txdir.flat_to_tree(lns.splitlines())
 
-def test_git2():
+def test_git2(u8):
     d = txdir.TxDir.fromcmds(['a/b','c/d'])
     txdir.TxDir('.gitignore',d,('c',))
     txdir.TxDir('b.txt',d('a/b'),('text in b',))
@@ -455,7 +485,7 @@ def test_git2():
     assert 'text in d' in vcd
     assert 'text in d' not in v
 
-def test_empty(tmpworkdir):
+def test_empty(tmpworkdir,u8):
     lst = '''\
 t/a/aa.txt
     this is aa
@@ -476,3 +506,4 @@ t/b/bb.txt
     assert os.stat('t/a/aa.txt').st_size==0
     assert os.stat('t/b/bb.txt').st_size==0
 
+# vim: ts=4 sw=4 sts=4 et noai nocin nosi inde=
