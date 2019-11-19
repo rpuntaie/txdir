@@ -19,6 +19,27 @@ txdir = importlib.machinery.SourceFileLoader("txdir", module_path).load_module()
 fromview = txdir.TxDir.fromview
 fromcmds = txdir.TxDir.fromcmds
 
+if 'win' in sys.platform:
+   txdir.set_tree_chars(
+        mid = r"`"
+        ,end = "`"
+        ,hor = "-"
+        ,ver = r"|"
+        ,mid_end =     ['`- ', '`- ']
+        ,sub_mid_end = ['|  ', '   ']
+   )
+   MID = r"`"
+   END = "`"
+   VER = "|"
+   HOR = "-"
+   txcmd = f'{here}\\txdir.py'
+else:
+   MID = '├'
+   END = '└'
+   HOR = '─'
+   VER = '│'
+   txcmd = f'{here}/txdir.py'
+
 def test_tree_parsing():
 
     def eqpth(a, b):
@@ -48,7 +69,7 @@ def test_tree_parsing():
     eqpth(fromcmds([r"foo\\\\bar,baz"]), [r"foo\\bar", "baz"])
 
 def test_cmd_help():
-    r = run([f'{here}/txdir.py','-h'],stdout=PIPE)
+    r = run([txcmd,'-h'],stdout=PIPE)
     lns = r.stdout.decode()
     assert r.returncode == 0
     assert '-h' in lns
@@ -61,19 +82,19 @@ def test_cmd_help():
     assert '-c' in lns
 
 def test_cmd_flatlist():
-    r = run([f'{here}/txdir.py','-l','-c','a/b'],stdout=PIPE)
+    r = run([txcmd,'-l','-c','a/b'],stdout=PIPE)
     assert r.returncode == 0
     lns = r.stdout.decode()
     assert 'a/b/' == lns.strip()
 
 def test_cmd_treelist():
-    r = run([f'{here}/txdir.py','-c','a/b'],stdout=PIPE)
+    r = run([txcmd,'-c','a/b'],stdout=PIPE)
     assert r.returncode == 0
     lns = r.stdout.decode()
-    assert '└─ b' in lns.strip()
+    assert '└─ b'.replace('─',HOR).replace('└',END) in lns.strip()
 
 def test_cmd_v():
-    r = run([f'{here}/txdir.py','-v','a/b'],stdout=PIPE)
+    r = run([txcmd,'-v','a/b'],stdout=PIPE)
     assert r.returncode == 0
     lns = r.stdout.decode()
     assert 'txdir' in lns.strip()
@@ -89,21 +110,21 @@ def tmpworkdir(tmpdir):
     os.chdir(cwd)
 
 def test_cmd_file1(tmpworkdir):
-    r = sprun(f"echo a | {here}/txdir.py - .",shell=True)
+    r = sprun("echo a | "+txcmd+" - .",shell=True)
     assert r.returncode == 0
     assert os.path.exists('a')
     with pytest.raises(NotADirectoryError):
         shutil.rmtree('a')
 
 def test_cmd_dir1(tmpworkdir):
-    r = sprun(f"echo a/ | {here}/txdir.py - .",shell=True)
+    r = sprun(f"echo a/ | "+txcmd+" - .",shell=True)
     assert r.returncode == 0
     assert os.path.exists('a')
     shutil.rmtree('a')
 
 @pytest.yield_fixture
 def b_with_a(tmpworkdir):
-    r = sprun(f"echo a/ | {here}/txdir.py - b",shell=True)
+    r = sprun(f"echo a/ | "+txcmd+" - b",shell=True)
     assert r.returncode == 0
     assert os.path.exists('b/a')
     assert os.path.isdir('b/a')
@@ -111,13 +132,13 @@ def b_with_a(tmpworkdir):
     shutil.rmtree('b')
 
 def test_cmd_cpdir(b_with_a,capsys):
-    r = run([f'{here}/txdir.py','b','c'])
+    r = run([txcmd,'b','c'])
     assert r.returncode == 0
     assert os.path.exists('c/a')
     assert os.path.isdir('c/a')
 
 def test_cmd_cpdir1(b_with_a,capsys):
-    r = run([f'{here}/txdir.py','.','c'])
+    r = run([txcmd,'.','c'])
     assert r.returncode == 0
     assert os.path.exists('c/b/a')
     assert os.path.isdir('c/b/a')
@@ -127,10 +148,10 @@ def test_cmd_showdir(b_with_a,capsys):
     txdir.main(infile='b',print=lambda *a,**ka: print(*a,file=buf,**ka))
     buf.seek(0)
     out = buf.read()
-    assert '└─ a/' in out
+    assert '└─ a/'.replace('─',HOR).replace('└',END) in out
 
 def test_cmd_copydir(b_with_a,capsys):
-    r=sprun(f"{here}/txdir.py b | {here}/txdir.py - witha",shell=True)
+    r=sprun(txcmd +" b | "+txcmd+" - witha",shell=True)
     assert r.returncode == 0
     assert os.path.exists('witha/a')
     assert os.path.isdir('witha/a')
@@ -148,12 +169,12 @@ def test_cmd_fromfile(b_with_a,capsys):
 
 def test_from_view(b_with_a):
     v = txdir.tree_to_view()
-    assert '└─ a/' in '\n'.join(v)
+    assert '└─ a/'.replace('─',HOR).replace('└',END) in '\n'.join(v)
 
 def test_dirtree_from_view1():
     v='''\
     └─ b/
-        └─ a/'''
+        └─ a/'''.replace('─',HOR).replace('└',END)
     d = fromview(v)
     assert d.content[0].content[0].path() == 'b/a'
     assert len(repr(d)) > 0
@@ -162,28 +183,30 @@ def test_dirtree_from_view1():
        d.cd('some/where')
 
 def test_dirtree_from_view2():
-    v=''' tmpt
+    v='''
+
+          tmpt
           └─ a
-             ├/mnt/b/e/f.txt
+             ├/tmpt/b/e/f.txt
              ├aa.txt
                this is aa
              b
              ├c
              │└d/
              ├k
-             │└/mnt/b/e
+             │└/tmpt/b/e
              ├e
              │└f.txt
              └g.txt
-               this is g'''
+               this is g'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
     d = fromview(v)
     f = d.flat()
     assert f == '''\
-tmpt/a/f.txt -> ../../mnt/b/e/f.txt
+tmpt/a/f.txt -> ../b/e/f.txt
 tmpt/a/aa.txt
    this is aa
 tmpt/b/c/d/
-tmpt/b/k/e -> ../../../mnt/b/e
+tmpt/b/k/e -> ../e
 tmpt/b/e/f.txt
 tmpt/b/g.txt
    this is g
@@ -203,7 +226,7 @@ def test_dirtree_from_view3(tmpworkdir):
       │  └─ f.txt
       ├─ g.txt
       └─ k/
-         └─ e -> ../../../b/e'''
+         └─ e -> ../../../b/e'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
     d = fromview(v)
     rv = d.view()
     assert rv == v
@@ -213,7 +236,7 @@ def test_dirtree_from_view3(tmpworkdir):
 
 @pytest.yield_fixture
 def tree(tmpworkdir):
-    lst = '''\
+    lst = '''
 tmpt/a/aa.txt
     this is aa
 
@@ -256,9 +279,9 @@ tmpt/b/
     assert captured.out == expected
 
 def test_nodot_nofile(tree):
-    r = run([f'{here}/txdir.py','.','-fn','-m','4'],stdout=PIPE)
+    r = run([txcmd,'.','-fn','-m','4'],stdout=PIPE)
     assert r.returncode == 0
-    lns = r.stdout.decode()
+    lns = '\n'.join(r.stdout.decode().splitlines())
     assert lns == '''\
 └─ tmpt/
    ├─ a/
@@ -270,13 +293,12 @@ def test_nodot_nofile(tree):
       ├─ e/
       │  └─ u/
       └─ k/
-         └─ e -> ../../../tmpt/a
-'''
+         └─ e -> ../../../tmpt/a'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
 
 def test_withcontent(tree):
-    r = run([f'{here}/txdir.py','.','-d','-m','4'],stdout=PIPE)
+    r = run([txcmd,'.','-d','-m','4'],stdout=PIPE)
     assert r.returncode == 0
-    lns = r.stdout.decode()
+    lns = '\n'.join(r.stdout.decode().splitlines())
     assert lns == '''\
 └─ tmpt/
    ├─ a/
@@ -294,8 +316,7 @@ def test_withcontent(tree):
       ├─ e/
       │  └─ u/
       └─ k/
-         └─ e -> ../../../tmpt/a
-'''
+         └─ e -> ../../../tmpt/a'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
 def test_dirflat(tmpworkdir):
     lst = '''\
 tmpt/a/aa.txt
@@ -331,7 +352,7 @@ tmpt/b/g.txt
 def test_mkdir(tmpworkdir):
     if 'win' in sys.platform:
         return True
-    sprun(fr"{here}/txdir.py - . -c 'a/b/d.c/d..a/u,v,x,g\.x'",shell=True)
+    sprun(txcmd+fr" - . -c 'a/b/d.c/d..a/u,v,x,g\.x'",shell=True)
     t1 = txdir.TxDir.fromfs('a')
     shutil.rmtree('a')
     sprun('mkdir -p a/{b,c}/d a/u a/v a/x a/g.x',shell=True)
@@ -358,7 +379,7 @@ def test_err1(tmpworkdir,capsys):
       │      └─ u/
       │         └─ v/
       │            └─ x/
-'''
+'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
     t = fromview(v)
     captured = capsys.readouterr()
     assert 'FIRST LINE OF FILE CONTENT MUST NOT BE EMPTY' in captured.err
@@ -380,7 +401,7 @@ def test_err1(tmpworkdir,capsys):
                
                 TEXT
                
-                NEWT'''
+                NEWT'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
 
 
 def test_err2(tmpworkdir,capsys):
@@ -388,7 +409,7 @@ def test_err2(tmpworkdir,capsys):
 └─ tmpt/
    ├─ a/
    │  ├─ b << a.b.c
-'''.splitlines()
+'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER).splitlines()
     txdir.view_to_tree(v)
     captured = capsys.readouterr()
     assert captured.err.startswith('Error')
@@ -399,7 +420,7 @@ def test_err3(tmpworkdir):
     with open('tmp','wb') as f:
        f.write(b'\xff') #UnicodeDecodeError
     lns = '\n'.join(txdir.tree_to_view('.'))
-    assert lns == "└─ tmp"
+    assert lns == "└─ tmp".replace('─',HOR).replace('└',END)
 
 
 def test_git1(tmpworkdir):

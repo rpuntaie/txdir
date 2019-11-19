@@ -14,7 +14,7 @@ import pathspec
 
 __version__ = "1.1.0"
 
-#these can be changed from outside to use e.g. only ASCII
+#see test_txdir.py to see how to change
 MID = '├'
 END = '└'
 HOR = '─'
@@ -22,8 +22,49 @@ VER = '│'
 LNKL = '<-'
 LNKR = '->'
 DWN = '<<'
-prefix_middle_end = [MID+HOR+' ',END+HOR+' ']
-prefix_sub_middle_end = [VER+'  ', '   ']
+MID_END = ['├─ ','└─ ']
+SUB_MID_END = ['│  ', '   ']
+
+def set_tree_chars(
+         mid = '├'
+        ,end = '└'
+        ,hor = '─'
+        ,ver = '│'
+        ,lnkl = '<-'
+        ,lnkr = '->'
+        ,dwn = '<<'
+        ,mid_end = ['├─ ','└─ ']
+        ,sub_mid_end = ['│  ', '   ']
+    ):
+    global MID
+    global END
+    global HOR
+    global VER
+    global LNKL
+    global LNKR
+    global DWN
+    global MID_END
+    global SUB_MID_END
+    MID         = mid
+    END         = end
+    HOR         = hor
+    VER         = ver
+    LNKL        = lnkl
+    LNKR        = lnkr
+    DWN         = dwn
+    MID_END     = mid_end
+    SUB_MID_END = sub_mid_end
+
+if 'win' in sys.platform:
+   set_tree_chars(
+        mid = r"`"
+        ,end = "`"
+        ,hor = "-"
+        ,ver = r"|"
+        ,mid_end =     ['`- ', '`- ']
+        ,sub_mid_end = ['|  ', '   ']
+   )
+
 
 #OS
 cwd = lambda: os.getcwd().replace('\\', '/')
@@ -166,7 +207,7 @@ def tree_to_view(rootpath = None
     if rootpath is None:
         rootpath = cwd()
     rootdir = rootpath
-    lenprefix = len(prefix_middle_end[0])
+    lenprefix = len(MID_END[0])
     gitignore = GitIgnore(start=rootpath,listdir=listdir,up=up,normjoin=normjoin,filecontent=filecontent,name=name)
     def _tree(p, prefix):
         ds = listdir(p)
@@ -180,17 +221,21 @@ def tree_to_view(rootpath = None
             dn = name(d)
             if not with_dot and dn.startswith('.'):
                 continue
-            padding = prefix + prefix_middle_end[i==lends-1]
+            padding = prefix + MID_END[i==lends-1]
             if islink(pd):
-                yield padding + dn + ' ' + LNKR + ' ' + readlink(pd)
+                try:
+                    rlink = readlink(pd)
+                except: # pragma: no cover
+                    rlink = ''
+                yield padding + dn + ' ' + LNKR + ' ' + rlink
             elif isdir(pd):
                 yield padding + dn + '/'
-                yield from _tree(pd, prefix + prefix_sub_middle_end[i==lends-1])
+                yield from _tree(pd, prefix + SUB_MID_END[i==lends-1])
             elif with_files:
                 yield padding + dn
                 if with_content:
                     for ln in filecontent(pd):
-                        yield prefix + 2*prefix_sub_middle_end[1] + ln.rstrip()
+                        yield prefix + 2*SUB_MID_END[1] + ln.rstrip()
     return _tree(rootdir, '')
 
 def rindices(regex, lns):
@@ -200,12 +245,17 @@ def rindices(regex, lns):
             yield i
 def intervals(nms):
     return list(zip(nms[:], nms[1:]))
-_re_pth_plus = re.compile(r'^(\w[^ </\\]*)(\s*'+DWN+r'\s*|\s*[\\/]\s*|\s*'+LNKR+r'\s*)*([\w\.].*)*')
-_re_lnk_pth_plus = re.compile(r'^(/?\w[^ </\\]*)(\s*'+DWN+r'\s*|\s*[\\/]\s*|\s*'+LNKR+r'\s*)*([\w\.].*)*') #for symlink
-_re_skip = re.compile(r'[^\s'+MID+VER+END+HOR+']')
-_re_skip_middle = re.compile(r'[^\s'+VER+']')
-_re_to_file = re.compile(r'['+MID+END+']')
-_re_space = re.compile(r'[^ ]')
+def _rex():
+    dwn = re.escape(DWN)
+    lnkr = re.escape(LNKR)
+    return argparse.Namespace(
+    _re_pth_plus = re.compile(r'^(\w[^ </\\]*)(\s*'+dwn+r'\s*|\s*[\\/]\s*|\s*'+lnkr+r'\s*)*([\w\.].*)*')
+    ,_re_lnk_pth_plus = re.compile(r'^(/?\w[^ </\\]*)(\s*'+dwn+r'\s*|\s*[\\/]\s*|\s*'+lnkr+r'\s*)*([\w\.].*)*') #for symlink
+    ,_re_skip = re.compile(r'[^\s'+re.escape(MID+VER+END+HOR)+']')
+    ,_re_skip_middle = re.compile(r'[^\s'+re.escape(VER)+']')
+    ,_re_to_file = re.compile(r'['+re.escape(MID+END)+']')
+    ,_re_space = re.compile(r'[^ ]')
+    )
 def view_to_tree(view_str_list
          ,fullpthroot=None
          #uses
@@ -215,6 +265,7 @@ def view_to_tree(view_str_list
          ,withcwd=with_cwd
          ,filewrite=filewrite
          ,eprint=eprint
+         ,r=None
          ):
     """
     Build a directory tree from a string list as returned by view_to_tree().
@@ -233,62 +284,25 @@ def view_to_tree(view_str_list
     :param view_str_list: tree as list of lines
     :param fullpthroot: internal use
 
-
-    Example::
-
-        >>> view_str_list='''
-        ...       tmpt
-        ...       └─ a
-        ...          ├/b/e/f.txt
-        ...          ├aa.txt
-        ...            this is aa
-        ...          └k.txt<<http://docutils.sourceforge.net/docs/user/rst/quickstart.txt
-        ...          b
-        ...          ├c
-        ...          │└d/
-        ...          ├k
-        ...          │└/b/e
-        ...          ├e
-        ...          │└f.txt
-        ...          └g.txt
-        ...            this is g'''.splitlines()
-        >>> view_to_tree(view_str_list)
-        >>> view_str_list='''
-        ...     tmpt
-        ...     ├── a
-        ...     │   ├── aa.txt
-        ...     │   ├── f.txt -> ../../b/e/f.txt
-        ...     │   └── k.txt
-        ...     └── b
-        ...         ├── c
-        ...         │   └── d/
-        ...         ├── e
-        ...         │   └── f.txt
-        ...         ├── g.txt
-        ...         └── k
-        ...             └── e -> ../../../b/e'''.splitlines()
-        >>> view_to_tree(view_str_list)
-        >>> import shutil
-        >>> shutil.rmtree('tmpt')
-
     """
 
+    _r = r or _rex()
     pwd = cwd()
     if not fullpthroot:
         fullpthroot = pwd
     for treestart, t in enumerate(view_str_list):
         try:
-            ct = _re_skip.search(t).span()[0]
+            ct = _r._re_skip.search(t).span()[0]
             break
         except:
             continue
     sublst = [t[ct:].rstrip() for t in view_str_list[treestart:]]
-    isublst = list(rindices(_re_lnk_pth_plus, sublst))
+    isublst = list(rindices(_r._re_lnk_pth_plus, sublst))
     isublst.append(len(sublst))
     for strt, last in intervals(isublst):
         file_entry = sublst[strt]
         try:
-            efile, delim, url = _re_pth_plus.match(file_entry).groups()
+            efile, delim, url = _r._re_pth_plus.match(file_entry).groups()
         except: #/symlink/rel/to/root <- name
             lnk = fullpthroot+file_entry
             lndst = basename(lnk)
@@ -296,8 +310,8 @@ def view_to_tree(view_str_list
                 _,lndst = lndst.split(LNKL)
                 lnk,_ = lnk.split(LNKL)
             except: pass
-            lnk = relpath(lnk.strip(),pwd)
             try:
+                lnk = relpath(lnk.strip().strip('/'),pwd.strip('/'))
                 symlink(lnk,lndst.strip())
             except: pass
             continue
@@ -305,7 +319,7 @@ def view_to_tree(view_str_list
             if strt < last - 1:
                 nxtline = sublst[strt + 1]
                 try:
-                    ix = _re_to_file.search(nxtline).span()[0]
+                    ix = _r._re_to_file.search(nxtline).span()[0]
                     # file name starter found
                     mkdir(efile)
                     with withcwd(efile):
@@ -322,7 +336,7 @@ def view_to_tree(view_str_list
                     cntent = sublst[strt + 1:last]
                     ct = 0
                     try:
-                        ct = _re_skip_middle.search(cntent[0]).span()[0]
+                        ct = _r._re_skip_middle.search(cntent[0]).span()[0]
                     except:
                         eprint(strt, last, '\n'.join(cntent[:10]))
                         eprint("FIRST LINE OF FILE CONTENT MUST NOT BE EMPTY!")
@@ -387,7 +401,11 @@ def tree_to_flat(rootpath = None
             nprefix = prefix+[dn]
             thispth = '/'.join(nprefix)
             if islink(pd):
-                yield thispth + ' ' + LNKR + ' ' + readlink(pd)
+                try:
+                    rlink = readlink(pd)
+                except: # pragma: no cover
+                    rlink = ''
+                yield thispth + ' ' + LNKR + ' ' + rlink
             elif isdir(pd):
                 entries = list(_tree(pd, nprefix))
                 if entries:
@@ -400,7 +418,7 @@ def tree_to_flat(rootpath = None
                     for ln in filecontent(pd):
                         tmpln = ln.rstrip()
                         if tmpln:
-                            yield prefix_sub_middle_end[1] + tmpln
+                            yield SUB_MID_END[1] + tmpln
                         else:
                             yield ''
     return _tree(rootdir,[])
@@ -411,6 +429,7 @@ def flat_to_tree(flat_str_list
          ,symlink=symlink
          ,filewrite=filewrite
          ,eprint=eprint
+         ,r=None
          ):
     """
     Build a directory tree from a list of strings as returned by tree_to_flat().
@@ -427,25 +446,9 @@ def flat_to_tree(flat_str_list
 
     :param flat_str_list: list of lines
 
-    Example::
-
-        >>> flat_str_list='''
-        ... tmpt/a/f.txt -> ../b/e/f.txt
-        ... tmpt/a/aa.txt
-        ...     this is aa
-        ...
-        ...     end of file
-        ... tmpt/b/c/d/
-        ... tmpt/b/k/e -> ../e
-        ... tmpt/b/e/f.txt
-        ... tmpt/b/g.txt
-        ...     this is g'''.splitlines()
-        >>> flat_to_tree(flat_str_list)
-        >>> import shutil
-        >>> shutil.rmtree('tmpt')
-
     """
 
+    _r = r or _rex()
     i,e = 0,None
     leni = len(flat_str_list)
     while i<leni:
@@ -483,7 +486,7 @@ def flat_to_tree(flat_str_list
                         break
                     j = j+1
                 ln0 = fllns[0]
-                indent = _re_space.search(ln0).span()[0]
+                indent = _r._re_space.search(ln0).span()[0]
                 i = j
             except: pass
             filewrite(e,[x[indent:]+'\n' for x in fllns])
@@ -491,11 +494,12 @@ def flat_to_tree(flat_str_list
 def to_tree(view_or_flat):
     """Check whether a flat text tree or an indented one,
     then create the file tree accordingly"""
-    treeidx = list(rindices(_re_to_file, view_or_flat))
+    _r = _rex()
+    treeidx = list(rindices(_r._re_to_file, view_or_flat))
     if treeidx:
-        view_to_tree(view_or_flat)
+        view_to_tree(view_or_flat,r=_r)
     else:
-        flat_to_tree(view_or_flat)
+        flat_to_tree(view_or_flat,r=_r)
 
 #classes
 class TxDir:
@@ -732,7 +736,7 @@ class TxDir:
             if e.isfile():
                 for x in e.content:
                     if x.strip():
-                        print(prefix_sub_middle_end[1]+x,end='')
+                        print(SUB_MID_END[1]+x,end='')
                     else:
                         print(x,end='')
         return ''.join(flines)
@@ -893,4 +897,4 @@ def main(print=print,**args):
 if __name__ == "__main__":
     raise SystemExit(main())
 
-# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4.
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
