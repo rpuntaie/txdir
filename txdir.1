@@ -51,6 +51,7 @@ optional arguments:
   -v              Print version information.
   -l              Create a flat listing instead of an indented text tree from
                   file tree.
+  -a              Use ASCII instead of unicode when printing the indented text tree.
   -f              Omit files. Just directories, when creating a text tree from
                   a file tree.
   -d              Include dot files/directories when creating a text tree from
@@ -60,8 +61,9 @@ optional arguments:
   -m M            Maximum depth to scan when creating a text tree from a file
                   tree.
   -c [C [C ...]]  Directories described with a DSL (\[aq],\[aq] = end of token, \[aq].\[aq] =
-                  up dir, \[aq]/\[aq] = down) \[ga]txdir - . -c a/b,c/d..a/u,v/g.x,g\[rs].x\[ga]
-                  produces the same as \[ga]mkdir -p a/{b,c}/d a/{u,v} a/x a/g.x\[ga]
+                  up dir, \[aq]/\[aq] = down) \[ga]txdir - . -c \[aq]a/b/d.c/d..a/u,v,x,g\[rs].x\[aq]\[ga]
+                  produces the same as \[ga]mkdir -p a/{b,c}/d a/u a/v a/x a/g.x\[ga]
+                  If not within \[aq], use \[rs]\[rs] to escape.
 \f[R]
 .fi
 .SH DESCRIPTION
