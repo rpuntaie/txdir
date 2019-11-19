@@ -58,8 +58,9 @@ Command line help::
       -m M            Maximum depth to scan when creating a text tree from a file
                       tree.
       -c [C [C ...]]  Directories described with a DSL (',' = end of token, '.' =
-                      up dir, '/' = down) `txdir - . -c a/b,c/d..a/u,v/g.x,g\.x`
-                      produces the same as `mkdir -p a/{b,c}/d a/{u,v} a/x a/g.x`
+                      up dir, '/' = down) `txdir - . -c 'a/b/d.c/d..a/u,v,x,g\.x'`
+                      produces the same as `mkdir -p a/{b,c}/d a/u a/v a/x a/g.x`
+                      If not within ', use \\ to escape.
 
 DESCRIPTION
 ===========

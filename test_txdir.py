@@ -16,8 +16,8 @@ def run(x,**kwargs):
 
 module_path = os.path.join(os.path.dirname(__file__), "txdir.py")
 txdir = importlib.machinery.SourceFileLoader("txdir", module_path).load_module()
-fromview = txdir.DirTree.fromview
-fromcmds = txdir.DirTree.fromcmds
+fromview = txdir.TxDir.fromview
+fromcmds = txdir.TxDir.fromcmds
 
 def test_tree_parsing():
 
@@ -154,14 +154,14 @@ def test_dirtree_from_view1():
     v='''\
     └─ b/
         └─ a/'''
-    dirtree = fromview(v)
-    assert dirtree.content[0].content[0].path() == 'b/a'
-    assert len(repr(dirtree)) > 0
-    assert len(str(dirtree)) > 0
+    d = fromview(v)
+    assert d.content[0].content[0].path() == 'b/a'
+    assert len(repr(d)) > 0
+    assert len(str(d)) > 0
     with pytest.raises(FileNotFoundError):
-       dirtree.cd('some/where')
+       d.cd('some/where')
 
-def test_dirtree_from_view2(capsys):
+def test_dirtree_from_view2():
     v=''' tmpt
           └─ a
              ├/mnt/b/e/f.txt
@@ -176,10 +176,9 @@ def test_dirtree_from_view2(capsys):
              │└f.txt
              └g.txt
                this is g'''
-    dirtree = fromview(v)
-    dirtree.flat()
-    captured = capsys.readouterr()
-    assert captured.out == '''\
+    d = fromview(v)
+    f = d.flat()
+    assert f == '''\
 tmpt/a/f.txt -> ../../mnt/b/e/f.txt
 tmpt/a/aa.txt
    this is aa
@@ -190,7 +189,7 @@ tmpt/b/g.txt
    this is g
 '''
 
-def test_dirtree_from_view3(tmpworkdir,capsys):
+def test_dirtree_from_view3(tmpworkdir):
     v='''\
 └─ tmpt/
    ├─ a/
@@ -204,13 +203,11 @@ def test_dirtree_from_view3(tmpworkdir,capsys):
       │  └─ f.txt
       ├─ g.txt
       └─ k/
-         └─ e -> ../../../b/e
-'''
-    dirtree = fromview(v)
-    dirtree.view()
-    captured = capsys.readouterr()
-    assert captured.out == v
-    dirtree.create()
+         └─ e -> ../../../b/e'''
+    d = fromview(v)
+    rv = d.view()
+    assert rv == v
+    d.create()
     newv = txdir.tree_to_view('.')
     assert '\n'.join(newv) == v.rstrip()
 
@@ -243,8 +240,8 @@ tmpt/b/e/
 tmpt/b/k/'''
 
 def test_flat1(tree):
-    dirtree = txdir.DirTree.fromfs('tmpt')
-    quick = dirtree.cd('b/e/u/f.txt')
+    d = txdir.TxDir.fromfs('tmpt')
+    quick = d.cd('b/e/u/f.txt')
     assert quick!=None
     assert quick.isfile()
     assert len(quick.content)>100
@@ -299,7 +296,7 @@ def test_withcontent(tree):
       └─ k/
          └─ e -> ../../../tmpt/a
 '''
-def test_dirflat(tmpworkdir,capsys):
+def test_dirflat(tmpworkdir):
     lst = '''\
 tmpt/a/aa.txt
     this is aa
@@ -312,14 +309,13 @@ tmpt/b/g.txt
          this is g
 
 '''
-    dirtree = txdir.DirTree.fromflat(lst)
-    assert dirtree.cd('tmpt/b/c/d')!=None
-    assert dirtree.cd('tmpt/b/c/../c')!=None
-    assert dirtree.cd('tmpt/b/c/./d')!=None
-    assert dirtree.cd(['tmpt','b'])!=None
-    dirtree.flat()
-    captured = capsys.readouterr()
-    expected = '''\
+    d = txdir.TxDir.fromflat(lst)
+    assert d.cd('tmpt/b/c/d')!=None
+    assert d.cd('tmpt/b/c/../c')!=None
+    assert d.cd('tmpt/b/c/./d')!=None
+    assert d.cd(['tmpt','b'])!=None
+    f = d.flat()
+    assert f == '''\
 tmpt/a/aa.txt
    this is aa
 
@@ -332,16 +328,14 @@ tmpt/b/g.txt
 
 '''
 
-    assert captured.out == expected
-
 def test_mkdir(tmpworkdir):
     if 'win' in sys.platform:
         return True
-    sprun(f'{here}/txdir.py - . -c a/b,c/d..a/u,v/g.x,g\.x',shell=True)
-    t1 = txdir.DirTree.fromfs('a')
+    sprun(fr"{here}/txdir.py - . -c 'a/b/d.c/d..a/u,v,x,g\.x'",shell=True)
+    t1 = txdir.TxDir.fromfs('a')
     shutil.rmtree('a')
-    sprun('mkdir -p a/{b,c}/d a/{u,v} a/x a/g.x',shell=True)
-    t2 = txdir.DirTree.fromfs('a')
+    sprun('mkdir -p a/{b,c}/d a/u a/v a/x a/g.x',shell=True)
+    t2 = txdir.TxDir.fromfs('a')
     shutil.rmtree('a')
     tt1 = t1.view()
     tt2 = t2.view()
@@ -408,7 +402,7 @@ def test_err3(tmpworkdir):
     assert lns == "└─ tmp"
 
 
-def test_git(tmpworkdir):
+def test_git1(tmpworkdir):
     shutil.copy2(f"{here}/.gitignore",os.path.join(tmpworkdir,'.gitignore'))
     ignoren = 'build'
     os.makedirs(ignoren)
@@ -428,6 +422,17 @@ def test_git(tmpworkdir):
     assert 'Yet Another Test' in lns
     txdir.flat_to_tree(lns.splitlines())
 
+def test_git2():
+    d = txdir.TxDir.fromcmds(['a/b','c/d'])
+    txdir.TxDir('.gitignore',d,('c',))
+    txdir.TxDir('b.txt',d('a/b'),('text in b',))
+    txdir.TxDir('b.txt',d('c/d'),('text in d',))
+    vab = d('a/b').view()
+    vcd = d('c/d').view()
+    v = d('.').view()
+    assert 'text in b' in vab
+    assert 'text in d' in vcd
+    assert 'text in d' not in v
 
 def test_empty(tmpworkdir):
     lst = '''\

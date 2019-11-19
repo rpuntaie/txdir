@@ -12,7 +12,7 @@ from urllib import request
 from tempfile import NamedTemporaryFile
 import pathspec
 
-__version__ = "1.0.2"
+__version__ = "1.1.0"
 
 #these can be changed from outside to use e.g. only ASCII
 MID = '├'
@@ -115,7 +115,7 @@ def up_dir(match
             return None
     if not parent:
         return parent
-    return up_dir(match,start=parent)
+    return up_dir(match,start=parent,listdir=listdir,up=up)
 class GitIgnore:
     def __init__(self
                  ,start
@@ -498,10 +498,14 @@ def to_tree(view_or_flat):
         flat_to_tree(view_or_flat)
 
 #classes
-class DirTree:
-    def __init__(self, name, parent=None, content=None):
+class TxDir:
+    def __init__(self, name='', parent=None, content=None):
         self.name = name
         self.parent = parent
+        if self.parent is None:
+            assert self.name == '', "the root node must not have a name"
+        elif self.parent is not None:
+            assert self.name != '', "non-root nodes must have a name"
         if self.parent:
             self.parent.content.append(self)
         self.content = [] if content is None else content
@@ -522,6 +526,9 @@ class DirTree:
 
     def __repr__(self):
         return f"{self.__class__.__name__}(path={self.path()!r})"
+
+    def __call__(self,*args,**kwargs):
+        return self.cd(*args,**kwargs)
 
     def path(self):
         ntry = [self]
@@ -554,7 +561,7 @@ class DirTree:
             if content is None:
                 raise FileNotFoundError(f"{an} in {c.path()} while cd to {apath}")
             else:
-                c = DirTree(an,c,[] if i<maxi else content)
+                c = TxDir(an,c,[] if i<maxi else content)
         return c
 
     def isfile(self):
@@ -568,7 +575,7 @@ class DirTree:
 
     @staticmethod
     def fromcmds(descs):
-        """Creates a DirTree from a list of command strings:
+        """Creates a TxDir from a list of command strings:
 
         , = end of token without extra meaning
         . = end of token and up dir ('..' is to times up)
@@ -578,15 +585,16 @@ class DirTree:
             descs (list): A list of command strings
 
         Returns:
-            A DirTree instance.
+            A TxDir instance.
 
         """
 
         def tokenize(string):
             token = ""
             escape = ""
+            maxi = len(string) - 1
             for i, char in enumerate(string):
-                if i == len(string) - 1:
+                if i == maxi:
                     yield token + char
                 elif char in (".", ",", "/"):
                     if escape:
@@ -598,12 +606,12 @@ class DirTree:
                         token = ""
                         escape = ""
                 elif char == "\\" and not escape:
-                    escape += char
+                    escape = char
                 else:
                     token += char
                     escape = ""
 
-        root = DirTree("")
+        root = TxDir()
         for desc in descs:
             current = root
             for token in tokenize(desc):
@@ -616,7 +624,7 @@ class DirTree:
                     if current.parent:
                         current = current.parent
                 else:
-                    node = DirTree(token, parent=current)
+                    node = TxDir(token, parent=current)
         return root
 
     @staticmethod
@@ -624,11 +632,11 @@ class DirTree:
         """Builds the directory tree from a tree view.
 
         viewstr:
-            A string from the output of DirTree.view().
+            A string from the output of TxDir.view().
 
         """
 
-        root = DirTree("")
+        root = TxDir()
         current = root
         def _cwd():
             return current
@@ -654,11 +662,11 @@ class DirTree:
         """Builds the directory tree from a tree flat listing.
 
         flatstr:
-            A string from the output of DirTree.flat().
+            A string from the output of TxDir.flat().
 
         """
 
-        root = DirTree("")
+        root = TxDir()
         flat_str_list = flatstr.splitlines()
         flat_to_tree(flat_str_list
                      ,mkdir=lambda apath: root.mkdir(apath)
@@ -681,34 +689,40 @@ class DirTree:
              ,with_content=with_content
              ,maxdepth=maxdepth
              ))
-        return DirTree.fromview(v)
+        return TxDir.fromview(v)
 
-    def view(self, print=print
+    def view(self
          ,with_dot=False
          ,with_files=True
          ,with_content=True
          ,maxdepth=MAXDEPTH
          ):
-        """print tree view with indentation"""
-        print('\n'.join(tree_to_view(self
-             ,with_dot=with_dot
-             ,with_files=with_files
-             ,with_content=with_content
-             ,maxdepth=maxdepth
-             ,isdir=lambda x: x.isdir()
-             ,normjoin=lambda *x: x[-2].cd(x[-1]) if isinstance(x[-1],str) else x[-1]
-             ,islink=lambda x: x.islink()
-             ,listdir=lambda x: x.content
-             ,filecontent=lambda x: x.content
-             ,readlink=lambda x: x.content
-             ,name=lambda x: x.name
-             ,up=lambda x: x.parent if x.parent else x
-             )))
+        """return tree view as string with indentation"""
+        resv = '\n'.join(tree_to_view(self
+            ,with_dot=with_dot
+            ,with_files=with_files
+            ,with_content=with_content
+            ,maxdepth=maxdepth
+            ,isdir=lambda x: x.isdir()
+            ,normjoin=lambda *x: x[-2].cd(x[-1]) if isinstance(x[-1],str) else x[-1]
+            ,islink=lambda x: x.islink()
+            ,listdir=lambda x: x.content
+            ,filecontent=lambda x: x.content
+            ,readlink=lambda x: x.content
+            ,name=lambda x: x.name
+            ,up=lambda x: x.parent if x.parent else x
+            ))
+        return resv
 
-    def flat(self, pint=print):
-        """print flat tree listing"""
+    def flat(self):
+        """return flat tree listing as string"""
+        flines = ['']
+        def print(v='',end='\n'):
+            if flines[-1].endswith('\n'):
+                flines.append('')
+            flines[-1] = flines[-1]+v+end
         for e in self:
-            print(e.path(),end="")
+            print(e.path(),end='')
             if e.islink():
                 print(' '+LNKR+' '+e.content)
             elif e.isdir():
@@ -718,9 +732,10 @@ class DirTree:
             if e.isfile():
                 for x in e.content:
                     if x.strip():
-                        print(prefix_sub_middle_end[1]+x,end="")
+                        print(prefix_sub_middle_end[1]+x,end='')
                     else:
-                        print(x,end="")
+                        print(x,end='')
+        return ''.join(flines)
 
     def create(self):
         """create tree in file system"""
@@ -801,8 +816,9 @@ def main(print=print,**args):
             (',' = end of token,
             '.' = up dir,
             '/' = down)
-            `txdir - . -c a/b,c/d..a/u,v/g.x,g\.x` produces the same as
-            `mkdir -p a/{b,c}/d a/{u,v} a/x a/g.x`
+            `txdir - . -c 'a/b/d.c/d..a/u,v,x,g\\.x'` produces the same as
+            `mkdir -p a/{b,c}/d a/u a/v a/x a/g.x`
+            If not within ', use \\\\ to escape.
 
             """
         )
@@ -834,7 +850,7 @@ def main(print=print,**args):
 
     dirtree = None
     if trees:
-        dirtree = DirTree.fromcmds(trees)
+        dirtree = TxDir.fromcmds(trees)
 
     fview = []
     inf = isfile(infile)
@@ -864,7 +880,7 @@ def main(print=print,**args):
     outf = isfile(outdir)
     if not outf:
         if outdir == '-':
-            if dirtree: dirtree.flat() if args.l else dirtree.view()
+            if dirtree: print(dirtree.flat()) if args.l else print(dirtree.view())
             if fview: print('\n'.join(fview))
         else: #dir
             mkdir(outdir)
