@@ -28,6 +28,7 @@ def u8(request):
     global VER
     global HOR
     if yes:
+       txdir.set_utf8()
        MID = '├'
        END = '└'
        HOR = '─'
@@ -36,14 +37,7 @@ def u8(request):
        txcmd = f'{here}/txdir.py'
     else:
        Z = '-a'
-       txdir.set_tree_chars(
-            mid = r"`"
-            ,end = "`"
-            ,hor = "-"
-            ,ver = r"|"
-            ,mid_end =     ['`- ', '`- ']
-            ,sub_mid_end = ['|  ', '   ']
-       )
+       txdir.set_ascii()
        MID = r"`"
        END = "`"
        VER = "|"
@@ -505,5 +499,33 @@ t/b/bb.txt
     assert os.path.exists('t/b/bb.txt')
     assert os.stat('t/a/aa.txt').st_size==0
     assert os.stat('t/b/bb.txt').st_size==0
+
+def test_ascii(tmpworkdir):
+    txdir.set_ascii()
+    t = txdir.TxDir.fromcmds(['r/a'])
+    txdir.TxDir('x.txt',t('r/a'),('Text in x',))
+    assert t.view() == '''\
+`- r/
+   `- a/
+      `- x.txt
+            Text in x'''
+    assert t.flat() == '''\
+r/a/x.txt
+   Text in x'''
+    shutil.rmtree('r',ignore_errors=True)
+    t.create()
+    t = txdir.TxDir.fromfs('r')
+    assert t.view() == '''\
+`- a/
+   `- x.txt
+         Text in x'''
+    shutil.rmtree('r',ignore_errors=True)
+    r = txdir.TxDir.fromcmds(['r'])
+    r = r('r')/t('a') #root is returned
+    assert t('a') == r('r/a') #r and t are roots
+    r.flat() == '''\
+r/a/x.txt
+   Text in x'''
+
 
 # vim: ts=4 sw=4 sts=4 et noai nocin nosi inde=

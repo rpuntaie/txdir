@@ -76,8 +76,12 @@ This allows to edit a whole file tree within one file first, without the
 necessity to switch files.
 .PP
 The text tree can also be templated and first run through a tool like
-stpl (https://github.com/rpuntaie/stpl) before being processed by M to
-produce the final file tree.
+stpl (https://github.com/rpuntaie/stpl) before being processed by
+\f[C]txdir\f[R] to produce the final file tree.
+This usage is like
+cookiecutter (https://github.com/cookiecutter/cookiecutter), only that
+it has the tree definition in one file.
+.SH INSTALLATION
 .PP
 To install for user only, do:
 .IP
@@ -86,7 +90,7 @@ To install for user only, do:
 pip install --user txdir
 \f[R]
 .fi
-.SH USAGE
+.SH COMMAND USAGE
 .PP
 Without arguments it expects input from \f[C]stdin\f[R]:
 .IP
@@ -97,7 +101,7 @@ txdir
 .fi
 .PP
 Exit this via \f[C]CTRL+C\f[R].
-Use no input argument in combination piping, or when using -c.
+Use no input argument only in combination with piping, or when using -c.
 .PP
 Use on a directory tree where
 .IP \[bu] 2
@@ -112,34 +116,30 @@ txdir .
 \f[R]
 .fi
 .PP
-It produces text output to \f[C]stdout\f[R], similar to \f[C]tree\f[R],
-but with content, unless content is suppressed with \f[C]-n\f[R].
+produces text output to \f[C]stdout\f[R], similar to \f[C]tree\f[R], but
+with content, unless content is suppressed with \f[C]-n\f[R].
 .PP
 You can save the output in a file and edit it:
 .IP
 .nf
 \f[C]
-txdir -l . > thisdir.txt
+txdir -l . > tmp.txt
 \f[R]
 .fi
 .PP
-The \f[C]-l\f[R] option makes the output flat to distinguish what is
-content and what is tree.
-Don\[aq]t worry, you can also drop the \f[C]-l\f[R], as
-\f[C]txdir . | txdir - .\f[R] does not create the same tree below
-\f[C]thisdir.txt\f[R], because \f[C]thisdir.txt\f[R] exists as file and
-not as directory.
+The \f[C]-l\f[R] option makes the output flat.
+You can drop the \f[C]-l\f[R], if you want \f[C]tmp.txt\f[R] contain an
+indented tree.
 .PP
-No directory is created unless a root directory is provided as second
-argument:
+NO directory is created, unless a root is provided as second argument:
 .IP
 .nf
 \f[C]
-txdir thisdir.txt .
+txdir tmp.txt .
 \f[R]
 .fi
 .PP
-This applies the (edited) text tree in \f[C]thisdir.txt\f[R] on the
+This applies to the (edited) text tree in \f[C]tmp.txt\f[R] on the
 current directory.
 .IP
 .nf
@@ -148,14 +148,14 @@ txdir . again
 \f[R]
 .fi
 .PP
-This produces the same tree below \f[C]again\f[R], almost like a
+produces the same tree below \f[C]again\f[R], almost like a
 \f[C]cp -R . again\f[R].
 But internally a text tree of the file tree is created and then applied
 to the new location.
 .PP
 \f[C]txdir\f[R] \f[B]does not work for binary files\f[R].
 If there are binary files, use \f[C]-f\f[R] to exclude files.
-Ignoring content with \[aq]-n\[aq], then reapplying will empty all
+Ignoring content with \f[C]-n\f[R], then reapplying, will empty all
 files.
 .PP
 NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY ACCORDING FILES IN THE FILE
@@ -163,6 +163,225 @@ TREE.
 .PP
 Note, also, that \f[B]text file content must not have an empty first
 line\f[R].
+.SS EXAMPLES
+.IP
+.nf
+\f[C]
+cd \[ti]/tmp
+txdir -c r/a/x,y,z
+   \[u2514]\[u2500] r/
+      \[u2514]\[u2500] a/
+         \[u251C]\[u2500] x/
+         \[u251C]\[u2500] y/
+         \[u2514]\[u2500] z/
+txdir - . -c r/a/x,y,z
+cd r
+tree
+   .
+   \[u2514]\[u2500]\[u2500] a
+       \[u251C]\[u2500]\[u2500] x
+       \[u251C]\[u2500]\[u2500] y
+       \[u2514]\[u2500]\[u2500] z
+txdir .
+   \[u2514]\[u2500] a/
+      \[u251C]\[u2500] x/
+      \[u251C]\[u2500] y/
+      \[u2514]\[u2500] z/
+txdir . > tmp.txt
+#edit tmp.txt
+cat tmp.txt
+   \[u251C]\[u2500] a/
+   \[br]  \[u251C]\[u2500] x/
+         \[u251C]\[u2500] x.txt
+              This is content in x.txt
+   \[br]  \[u251C]\[u2500] y/
+         \[u251C]\[u2500] y.txt
+              This is content in y.txt
+txdir tmp.txt .
+txdir .
+   \[u251C]\[u2500] a/
+   \[br]  \[u251C]\[u2500] x/
+   \[br]  \[br]  \[u2514]\[u2500] x.txt
+   \[br]  \[br]        This is content in x.txt
+   \[br]  \[u251C]\[u2500] y/
+   \[br]  \[br]  \[u2514]\[u2500] y.txt
+   \[br]  \[br]        This is content in y.txt
+   \[br]  \[u2514]\[u2500] z/
+   \[u2514]\[u2500] tmp.txt
+         \[u251C]\[u2500] a/
+         \[br]  \[u251C]\[u2500] x/
+               \[u251C]\[u2500] x.txt
+                    This is content in x.txt
+         \[br]  \[u251C]\[u2500] y/
+               \[u251C]\[u2500] y.txt
+                    This is content in y.txt
+#Note, that what is below tmp.txt is content of tmp.txt, not actual directories.
+#\[ga]txdir . | txdir - .\[ga] does not create the same tree below \[ga]\[ga]tmp.txt\[ga]\[ga],
+#because tmp.txt exists as file and not as directory.
+txdir a b
+txdir . > tmp.txt
+#edit tmp.txt adding {{txt}} and removing the tmp.txt line (else tmp.txt is emptied when applying)
+cat tmp.txt
+   \[u251C]\[u2500] a/
+   \[br]  \[u251C]\[u2500] x/
+   \[br]  \[br]  \[u2514]\[u2500] x.txt
+   \[br]  \[br]        {{txt}} x.txt
+   \[br]  \[u251C]\[u2500] y/
+   \[br]  \[br]  \[u2514]\[u2500] y.txt
+   \[br]  \[br]        {{txt}} y.txt
+   \[br]  \[u2514]\[u2500] z/
+   \[u251C]\[u2500] b/
+   \[br]  \[u251C]\[u2500] x/
+   \[br]  \[br]  \[u2514]\[u2500] x.txt
+   \[br]  \[br]        {{txt}} x.txt
+   \[br]  \[u251C]\[u2500] y/
+   \[br]  \[br]  \[u2514]\[u2500] y.txt
+   \[br]  \[br]        {{txt}} y.txt
+   \[br]  \[u2514]\[u2500] z/
+stpl tmp.txt - \[aq]txt=\[dq]Greeting from\[dq]\[aq] | txdir - .
+rm tmp.txt
+txdir . -l
+   a/x/x.txt
+      Greeting from x.txt
+   a/y/y.txt
+      Greeting from y.txt
+   a/z/
+   b/x/x.txt
+      Greeting from x.txt
+   b/y/y.txt
+      Greeting from y.txt
+   b/z/
+txdir . -l | sed -e \[dq]s/ \[rs](.\[rs])\[rs].txt/ \[rs]1/g\[dq] | txdir - .
+txdir . -l
+   a/x/x.txt
+      Greeting from x
+   a/y/y.txt
+      Greeting from y
+   a/z/
+   b/x/x.txt
+      Greeting from x
+   b/y/y.txt
+      Greeting from y
+   b/z/
+\f[R]
+.fi
+.SH API USAGE
+.PP
+\f[C]txtdir\f[R] is a python module.
+.PP
+Naming:
+.IP \[bu] 2
+\f[C]view\f[R] refers to a text tree view
+.IP \[bu] 2
+\f[C]flat\f[R] is a flat tree listing.
+.IP \[bu] 2
+\f[C]tree\f[R] is the actual file tree
+.PP
+Functions:
+.IP \[bu] 2
+\f[C]set_ascii\f[R], \f[C]set_utf8\f[R]
+.IP \[bu] 2
+\f[C]view_to_tree\f[R]
+.IP \[bu] 2
+\f[C]tree_to_view\f[R]
+.IP \[bu] 2
+\f[C]flat_to_tree\f[R]
+.IP \[bu] 2
+\f[C]tree_to_flat\f[R]
+.IP \[bu] 2
+\f[C]to_tree\f[R] decides whether \f[C]flat_to_tree\f[R] or
+\f[C]view_to_tree\f[R] should be used
+.IP \[bu] 2
+\f[C]main\f[R] makes the command line functionality accessible to python
+.PP
+Class:
+.PP
+\f[C]TxDir\f[R] can hold a file tree in memory.
+Its \f[C]content\f[R] represents
+.IP \[bu] 2
+\f[I]directory\f[R] if \f[I]list\f[R] of other \f[C]TxDir\f[R] instances
+.IP \[bu] 2
+\f[I]link\f[R] if \f[I]str\f[R] with path relative to the location as
+link target
+.IP \[bu] 2
+\f[I]file\f[R] if \f[I]tuple\f[R] of text file lines
+.PP
+\f[C]TxDir\f[R] methods:
+.IP
+.nf
+\f[C]
+__init__(self, name=\[aq]\[aq], parent=None, content=None)
+__iter__(self) #leaves only
+__lt__(self,other) #by name
+__str__(self)
+__repr__(self)
+__call__ = cd
+__truediv__(self, other) #changes and returns root
+root(self)
+path(self)
+mkdir = cd #with content=[]
+cd(self,apath,content=None) #cd or make node if content!=None
+isfile(self)
+isdir(self)
+islink(self)
+view(self)
+flat(self)
+create(self)
+\f[R]
+.fi
+.PP
+static:
+.IP
+.nf
+\f[C]
+fromcmds(descs)
+fromview(viewstr)
+fromflat(flatstr)
+fromfs(root)
+\f[R]
+.fi
+.SS EXAMPLES
+.IP
+.nf
+\f[C]
+>>> import os
+>>> from os.path import expanduser
+>>> from shutil import rmtree
+>>> import sys
+>>> from txdir import *
+
+>>> os.chdir(expanduser(\[aq]\[ti]/tmp\[aq]))
+
+>>> t = t.fromcmds([\[aq]r/a\[aq]])
+>>> TxDir(\[aq]x.txt\[aq],t(\[aq]r/a\[aq]),(\[aq]Text in x\[aq],))
+>>> t.view()
+\[u2514]\[u2500] r/
+   \[u2514]\[u2500] a/
+      \[u2514]\[u2500] x.txt
+            Text in x
+>>> t.flat()
+r/a/x.txt
+   Text in x
+
+>>> rmtree(\[aq]r\[aq],ignore_errors=True)
+>>> t.create()
+
+>>> t = TxDir.fromfs(\[aq]r\[aq])
+>>> t.view()
+\[u2514]\[u2500] a/
+   \[u2514]\[u2500] x.txt
+         Text in x
+
+>>> rmtree(\[aq]r\[aq],ignore_errors=True)
+>>> r = TxDir.fromcmds([\[aq]r\[aq]])
+>>> r = r(\[aq]r\[aq])/t(\[aq]a\[aq]) #root is returned
+>>> t(\[aq]a\[aq]) == r(\[aq]r/a\[aq]) #r and t are roots
+True
+>>> r.flat()
+r/a/x.txt
+   Text in x
+\f[R]
+.fi
 .SS License
 .PP
 MIT

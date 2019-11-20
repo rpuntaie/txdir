@@ -12,7 +12,7 @@ from urllib import request
 from tempfile import NamedTemporaryFile
 import pathspec
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 #see test_txdir.py to see how to change
 MID = '├'
@@ -54,6 +54,20 @@ def set_tree_chars(
     DWN         = dwn
     MID_END     = mid_end
     SUB_MID_END = sub_mid_end
+
+def set_ascii():
+    set_tree_chars(
+         mid = r"`"
+         ,end = "`"
+         ,hor = "-"
+         ,ver = r"|"
+         ,mid_end =     ['`- ', '`- ']
+         ,sub_mid_end = ['|  ', '   ']
+    )
+
+def set_utf8():
+    set_tree_chars()
+
 
 #OS
 cwd = lambda: os.getcwd().replace('\\', '/')
@@ -492,6 +506,15 @@ def to_tree(view_or_flat):
 
 #classes
 class TxDir:
+    """
+    ``TxDir`` can hold a file tree in memory. Its ``content`` represents
+
+    - *directory* if *list* of other ``TxDir`` instances
+    - *link* if *str* with path relative to the location as link target
+    - *file* if *tuple* of text file lines
+
+    """
+
     def __init__(self, name='', parent=None, content=None):
         self.name = name
         self.parent = parent
@@ -522,6 +545,17 @@ class TxDir:
 
     def __call__(self,*args,**kwargs):
         return self.cd(*args,**kwargs)
+
+    def __truediv__(self, other):
+       self.content.append(other)
+       other.parent = self
+       return self.root()
+
+    def root(self):
+        r = self
+        while r.parent:
+            r = r.parent
+        return r
 
     def path(self):
         ntry = [self]
@@ -847,14 +881,7 @@ def main(print=print,**args):
     trees        = args.c
 
     if args.a:
-        set_tree_chars(
-             mid = r"`"
-             ,end = "`"
-             ,hor = "-"
-             ,ver = r"|"
-             ,mid_end =     ['`- ', '`- ']
-             ,sub_mid_end = ['|  ', '   ']
-        )
+        set_ascii()
 
     dirtree = None
     if trees:
