@@ -10,9 +10,11 @@ import contextlib
 from threading import RLock
 from urllib import request
 from tempfile import NamedTemporaryFile
+from base64 import b64encode, b64decode
 import pathspec
 
-__version__ = "1.1.1"
+#also in README.rst
+__version__ = "2.0.0"
 
 #see test_txdir.py to see how to change
 MID = '├'
@@ -97,19 +99,48 @@ def with_cwd(apth,cwd=cwd,cd=cd):
     finally:
         cd(prev_cwd)
         _cdlock.release()
-def filecontent(pd):
+def filecontent(pd,with_binary=False):
     try:
         with open(pd, encoding='utf-8') as f:
-            yield from f.readlines()
+            return f.readlines()
     except UnicodeDecodeError:
-        return
-
+        if with_binary:
+            with open(pd, 'rb') as f:
+                return f.read()
 def filewrite(efile,cntlns):
-    dexists = dirname(efile)
-    if dexists and not exists(dexists):
-        mkdir(dexists)
-    with open(efile, 'w', encoding='utf-8', newline='\n') as f:
-        f.writelines(cntlns)
+    dr = dirname(efile)
+    if dr and not exists(dr):
+        mkdir(dr)
+    if isinstance(cntlns,bytes):
+        with open(efile, 'wb') as f:
+            f.write(cntlns)
+    else:
+        with open(efile, 'w', encoding='utf-8', newline='\n') as f:
+            f.writelines(cntlns)
+def fileyield(pd,tpad
+             ,with_binary=False
+             ,filecontent=filecontent
+              ):
+    fcontent = filecontent(pd,with_binary=with_binary)
+    if fcontent is None:
+        return
+    if isinstance(fcontent,bytes):
+        yield tpad + repr(b64encode(fcontent)) #encloded in b''
+    else:
+        for ln in fcontent:
+            tmpln = ln.rstrip()
+            if tmpln:
+                yield tpad + tmpln
+            else:
+                yield ''
+def fileput(efile,cntlns,filewrite=filewrite):
+    if len(cntlns)==1 and cntlns[0].startswith("b'") and cntlns[0].rstrip().endswith("'"): # enclosed in b''
+        #cntlns = [repr(b64encode(b'chk'))] #b'Y2hr'
+        cntbytes = b64decode(cntlns[0].rstrip()[2:-1].encode()) #b'chk'
+        filewrite(efile,cntbytes)
+        return
+    filewrite(efile,cntlns)
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 @contextlib.contextmanager
@@ -125,7 +156,9 @@ def urlretrieve(url,tofile,filewrite=filewrite,filecontent=filecontent,eprint=ep
     with temp() as f:
         try:
             request.urlretrieve(url, f)
-            filewrite(tofile,filecontent(f))
+            fco = filecontent(f,with_binary=True)
+            if fco:
+                filewrite(tofile,fco)
         except Exception as err:
             eprint("Error retrieving "+url+" to "+tofile+':', err)
 def up_dir(match
@@ -183,6 +216,7 @@ def tree_to_view(rootpath = None
          ,with_dot=False
          ,with_files=True
          ,with_content=True
+         ,with_binary=False
          ,maxdepth=MAXDEPTH
          #uses
          ,isdir = isdir
@@ -195,13 +229,14 @@ def tree_to_view(rootpath = None
          ,up=dirname
          ):
     """
-    Returns a generator for a tree view as produced by the linux tree tool,
-    but optionally with content of files
+    Returns a generator for an indented text view of a directory,
+    with content of files.
 
-    :param rootpath: path of which to create the tree string
+    :param rootpath: path of which to create the text view
     :param with_dot: also include files starting with .
     :param with_files: else only directories are listed
     :param with_content: use this only if all the files are text
+    :param with_binary: include binary files
     :param maxdepth: max directory depth to list
 
     :return: generator for the lines
@@ -237,8 +272,11 @@ def tree_to_view(rootpath = None
             elif with_files:
                 yield padding + dn
                 if with_content:
-                    for ln in filecontent(pd):
-                        yield prefix + 2*SUB_MID_END[1] + ln.rstrip()
+                    tpad = ' '*len(prefix + 2*SUB_MID_END[1])
+                    yield from fileyield(pd,tpad
+                                         ,with_binary=with_binary
+                                         ,filecontent=filecontent
+                                         )
     return _tree(rootdir, '')
 
 def rindices(regex, lns):
@@ -271,7 +309,7 @@ def view_to_tree(view_str_list
          ,r=None
          ):
     """
-    Build a directory tree from a string list as returned by view_to_tree().
+    Build a directory from a indented text view as returned by view_to_tree().
     The level is determined by the identation.
 
     - Ending in ``/``: make a directory leaf
@@ -284,7 +322,7 @@ def view_to_tree(view_str_list
     - Not starting with ├└ are file content.
       The first line must not be empty.
 
-    :param view_str_list: tree as list of lines
+    :param view_str_list: list of lines
     :param fullpthroot: internal use
 
     """
@@ -344,7 +382,7 @@ def view_to_tree(view_str_list
                         eprint(strt, last, '\n'.join(cntent[:10]))
                         eprint("FIRST LINE OF FILE CONTENT MUST NOT BE EMPTY!")
                     cntlns = [t[ct:] + '\n' for t in cntent]
-                    filewrite(efile,cntlns)
+                    fileput(efile,cntlns,filewrite=filewrite)
             elif delim:
                 if '\\' in delim or '/' in delim:
                     mkdir(efile)
@@ -355,12 +393,14 @@ def view_to_tree(view_str_list
                 elif DWN in delim:
                     urlretrieve(url, efile,filewrite=filewrite,eprint=eprint)
             else:
-                filewrite(efile,'')
+                if not exists(efile):
+                    filewrite(efile,'')
 
 def tree_to_flat(rootpath = None
          ,with_dot=False
          ,with_files=True
          ,with_content=True
+         ,with_binary=False
          ,maxdepth=MAXDEPTH
          #uses
          ,isdir = isdir
@@ -373,13 +413,14 @@ def tree_to_flat(rootpath = None
          ,up=dirname
          ):
     """
-    Returns a generator for a flat tree listing,
-    optionally with content of files
+    Returns a generator for a flat text listing of a directory
+    with content of files
 
-    :param rootpath: path of which to create the tree string
+    :param rootpath: path of which to create the text listing
     :param with_dot: also include files starting with .
     :param with_files: else only directories are listed
     :param with_content: use this only if all the files are text
+    :param with_binary: include binary files
     :param maxdepth: max directory depth to list
 
     :return: generator for the lines
@@ -418,12 +459,10 @@ def tree_to_flat(rootpath = None
             elif with_files:
                 yield thispth
                 if with_content:
-                    for ln in filecontent(pd):
-                        tmpln = ln.rstrip()
-                        if tmpln:
-                            yield SUB_MID_END[1] + tmpln
-                        else:
-                            yield ''
+                    yield from fileyield(pd,SUB_MID_END[1]
+                                         ,with_binary=with_binary
+                                         ,filecontent=filecontent
+                                         )
     return _tree(rootdir,[])
 
 def flat_to_tree(flat_str_list
@@ -435,7 +474,7 @@ def flat_to_tree(flat_str_list
          ,r=None
          ):
     """
-    Build a directory tree from a list of strings as returned by tree_to_flat().
+    Build a directory from a list of strings as returned by tree_to_flat().
 
     - Ending in ``/``: make a directory leaf
 
@@ -492,11 +531,13 @@ def flat_to_tree(flat_str_list
                 indent = _r._re_space.search(ln0).span()[0]
                 i = j
             except: pass
-            filewrite(e,[x[indent:]+'\n' for x in fllns])
+            flcntlns = [x[indent:]+'\n' for x in fllns]
+            if flcntlns or not exists(e):
+                fileput(e,flcntlns,filewrite=filewrite)
 
 def to_tree(view_or_flat):
-    """Check whether a flat text tree or an indented one,
-    then create the file tree accordingly"""
+    """Check whether a flat listing or indented view,
+    then create the directory accordingly"""
     _r = _rex()
     treeidx = list(rindices(_r._re_to_file, view_or_flat))
     if treeidx:
@@ -507,7 +548,7 @@ def to_tree(view_or_flat):
 #classes
 class TxDir:
     """
-    ``TxDir`` can hold a file tree in memory. Its ``content`` represents
+    ``TxDir`` can hold a directory in memory. Its ``content`` represents
 
     - *directory* if *list* of other ``TxDir`` instances
     - *link* if *str* with path relative to the location as link target
@@ -656,7 +697,7 @@ class TxDir:
 
     @staticmethod
     def fromview(viewstr,eprint=eprint):
-        """Builds the directory tree from a tree view.
+        """Builds the directory from an indented view.
 
         viewstr:
             A string from the output of TxDir.view().
@@ -686,7 +727,7 @@ class TxDir:
 
     @staticmethod
     def fromflat(flatstr,eprint=eprint):
-        """Builds the directory tree from a tree flat listing.
+        """Builds the directory from a flat listing.
 
         flatstr:
             A string from the output of TxDir.flat().
@@ -708,12 +749,14 @@ class TxDir:
          ,with_dot=False
          ,with_files=True
          ,with_content=True
+         ,with_binary=False
          ,maxdepth=MAXDEPTH
          ):
         v = '\n'.join(tree_to_view(root
              ,with_dot=with_dot
              ,with_files=with_files
              ,with_content=with_content
+             ,with_binary=with_binary
              ,maxdepth=maxdepth
              ))
         return TxDir.fromview(v)
@@ -722,19 +765,21 @@ class TxDir:
          ,with_dot=False
          ,with_files=True
          ,with_content=True
+         ,with_binary=False
          ,maxdepth=MAXDEPTH
          ):
-        """return tree view as string with indentation"""
+        """return an indented text view as string"""
         resv = '\n'.join(tree_to_view(self
             ,with_dot=with_dot
             ,with_files=with_files
             ,with_content=with_content
+            ,with_binary=with_binary
             ,maxdepth=maxdepth
             ,isdir=lambda x: x.isdir()
             ,normjoin=lambda *x: x[-2].cd(x[-1]) if isinstance(x[-1],str) else x[-1]
             ,islink=lambda x: x.islink()
             ,listdir=lambda x: x.content
-            ,filecontent=lambda x: x.content
+            ,filecontent=lambda x,**k: x.content
             ,readlink=lambda x: x.content
             ,name=lambda x: x.name
             ,up=lambda x: x.parent if x.parent else x
@@ -742,7 +787,7 @@ class TxDir:
         return resv
 
     def flat(self):
-        """return flat tree listing as string"""
+        """return flat listing as string"""
         flines = ['']
         def print(v='',end='\n'):
             if flines[-1].endswith('\n'):
@@ -764,8 +809,8 @@ class TxDir:
                         print(x,end='')
         return ''.join(flines)
 
-    def create(self):
-        """create tree in file system"""
+    def tree(self):
+        """Create directory in file system"""
         lastdir = None
         for e in self:
             if e.islink():
@@ -778,14 +823,14 @@ class TxDir:
                 mkdir(lastdir)
             else:
                 mkdir(dirname(e.path()))
-                filewrite(e.path(),e.content)
+                fileput(e.path(),e.content)
         return lastdir
 
 
 def main(print=print,**args):
     """Command line functionality."""
     if args:
-        for x in 'valfdn':
+        for x in 'vablfdn':
             args.setdefault(x,False)
         args.setdefault('m',MAXDEPTH)
         args.setdefault('c',[])
@@ -795,9 +840,8 @@ def main(print=print,**args):
     else:
         parser = argparse.ArgumentParser(add_help=False,description='''\
         Files/dirs are ignored via .gitignore.
-        If the directory contains unignored binary files, exclude files with '-f'.
-        Ignoring content with '-n', then reapplying will empty all files.
-        NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY ACCORDING FILES IN THE FILE TREE.
+        If the directory contains unignored binary files,
+        exclude files with '-f' or ignoring content with '-n'.
         Text file content must not have an empty first line.
         '''
         )
@@ -811,34 +855,39 @@ def main(print=print,**args):
         parser.add_argument(
             "-a",
             action="store_true",
-            help="Use ASCII instead of unicode when printint the text tree.",
+            help="Use ASCII instead of unicode when printint the indented view.",
+        )
+        parser.add_argument(
+            "-b",
+            action="store_true",
+            help="Include content of binary files as base64 encoded.",
         )
         parser.add_argument(
             "-l",
             action="store_true",
-            help="Create a flat listing instead of an indented text tree from file tree.",
+            help="Create a flat listing instead of an indented view.",
         )
         parser.add_argument(
             "-f",
             action="store_true",
-            help="Omit files. Just directories, when creating a text tree from a file tree.",
+            help="Omit files. Only list directories.",
         )
         parser.add_argument(
             "-d",
             action="store_true",
-            help="Include dot files/directories when creating a text tree from a file tree.",
+            help="Include dot files/directories.",
         )
         parser.add_argument(
             "-n",
             action="store_true",
-            help="Omit file content when creating a text tree from a file tree.",
+            help="Omit file content.",
         )
         parser.add_argument(
             "-m",
             action="store",
             default=MAXDEPTH,
             type=int,
-            help="Maximum depth to scan when creating a text tree from a file tree.",
+            help="Maximum directory depth to scan.",
         )
         parser.add_argument(
             "-c",
@@ -858,14 +907,14 @@ def main(print=print,**args):
             'infile',
             nargs='?',
             default='-',
-            help="""If a file, it is expected to contain a text tree, flat or indented (none or - is stdin).
-            If a directory, the text tree is created from the file tree (like the Linux tree tool)."""
+            help="""If a file, it is expected to contain a text representation of a directory, flat or indented (none or - is stdin).
+            If a directory, the text view is created with file content (unless -n)."""
         )
         parser.add_argument(
             'outdir',
             nargs='?',
             default='-',
-            help="""None or - means printing the tree to stdout.
+            help="""None or - means printing to stdout.
             If the parameter is an existing file, nothing is done.
             If not a directory, the directory is created.
             The file tree is created in the directory."""
@@ -877,15 +926,16 @@ def main(print=print,**args):
     with_dot     = args.d
     with_files   = not args.f
     with_content = not args.n
+    with_binary  = args.b
     maxdepth     = args.m
     trees        = args.c
 
     if args.a:
         set_ascii()
 
-    dirtree = None
+    tx = None
     if trees:
-        dirtree = TxDir.fromcmds(trees)
+        tx = TxDir.fromcmds(trees)
 
     try:
         sys.stdin = codecs.getreader("utf-8")(sys.stdin.detach())
@@ -907,6 +957,7 @@ def main(print=print,**args):
                         ,with_dot=with_dot
                         ,with_files=with_files
                         ,with_content=with_content
+                        ,with_binary=with_binary
                         ,maxdepth=maxdepth
                                       ))
         else:
@@ -914,17 +965,18 @@ def main(print=print,**args):
                              ,with_dot=with_dot
                              ,with_files=with_files
                              ,with_content=with_content
+                             ,with_binary=with_binary
                              ,maxdepth=maxdepth
                                   ))
     outf = isfile(outdir)
     if not outf:
         if outdir == '-':
-            if dirtree: print(dirtree.flat()) if args.l else print(dirtree.view())
+            if tx: print(tx.flat()) if args.l else print(tx.view())
             if fview: print('\n'.join(fview))
         else: #dir
             mkdir(outdir)
             with with_cwd(outdir):
-                if dirtree: dirtree.create()
+                if tx: tx.tree()
                 if fview: to_tree(fview)
     return 0
 

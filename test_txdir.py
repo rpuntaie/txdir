@@ -4,6 +4,7 @@ import io
 import importlib.machinery
 import shutil
 from subprocess import run as sprun, PIPE
+from base64 import b64encode, b64decode
 import pytest
 
 here = os.path.dirname(__file__)
@@ -255,7 +256,7 @@ def test_dirtree_from_view3(tmpworkdir,u8):
     d = fromview(v)
     rv = d.view()
     assert rv == v
-    d.create()
+    d.tree()
     newv = txdir.tree_to_view('.')
     assert '\n'.join(newv) == v.rstrip()
 
@@ -327,14 +328,14 @@ def test_withcontent(tree,u8):
 └─ tmpt/
    ├─ a/
    │  ├─ aa.txt
-   │        this is aa
-   │        
+            this is aa
+
    │  ├─ f.txt -> ../b/e/f.txt
    │  └─ u -> ../../tmpt/a
    └─ b/
       ├─ .g.txt
             this is g
-            
+
       ├─ c/
       │  └─ d/
       ├─ e/
@@ -394,7 +395,7 @@ def test_err1(tmpworkdir,capsys,u8):
    └─ b/
       ├─ e/
       │  └─ f.txt
-             
+
              TEXT
 
              NEWT
@@ -407,8 +408,8 @@ def test_err1(tmpworkdir,capsys,u8):
     t = fromview(v)
     captured = capsys.readouterr()
     assert 'FIRST LINE OF FILE CONTENT MUST NOT BE EMPTY' in captured.err
-    t.create()
-    t.create() #no file exists error!
+    t.tree()
+    t.tree() #no file exists error!
     txdir.view_to_tree(v.splitlines()) #no file exists error!
     assert os.path.exists('tmpt/b/e/f.txt')
     res = '\n'.join(txdir.tree_to_view('.',maxdepth=4))
@@ -422,9 +423,9 @@ def test_err1(tmpworkdir,capsys,u8):
       │  └─ d/
       └─ e/
          └─ f.txt
-               
+
                 TEXT
-               
+
                 NEWT'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
 
 
@@ -439,13 +440,24 @@ def test_err2(tmpworkdir,capsys,u8):
     assert captured.err.startswith('Error')
     assert not os.path.exists('tmpt/a/b')
 
-def test_err3(tmpworkdir,u8):
+def test_nobin(tmpworkdir,u8):
     import random
     with open('tmp','wb') as f:
        f.write(b'\xff') #UnicodeDecodeError
     lns = '\n'.join(txdir.tree_to_view('.'))
     assert lns == "└─ tmp".replace('─',HOR).replace('└',END)
 
+def test_wbin(tmpworkdir,u8):
+    import random
+    with open('tmp','wb') as f:
+       f.write(b'\xff') #UnicodeDecodeError
+    lns = '\n'.join(txdir.tree_to_view('.',with_binary=True))
+    assert lns == '''\
+└─ tmp
+      '''.replace('─',HOR).replace('└',END)+repr(b64encode(b'\xff'))
+    txdir.view_to_tree(lns.splitlines())
+    with open('tmp','rb') as f:
+       assert f.read()==b'\xff'
 
 def test_git1(tmpworkdir,u8):
     shutil.copy2(f"{here}/.gitignore",os.path.join(tmpworkdir,'.gitignore'))
@@ -479,7 +491,7 @@ def test_git2(u8):
     assert 'text in d' in vcd
     assert 'text in d' not in v
 
-def test_empty(tmpworkdir,u8):
+def test_nonempty(tmpworkdir,u8):
     lst = '''\
 t/a/aa.txt
     this is aa
@@ -491,14 +503,16 @@ t/b/bb.txt
     txdir.flat_to_tree(lst)
     assert os.path.exists('t/a/aa.txt')
     assert os.path.exists('t/b/bb.txt')
-    assert os.stat('t/a/aa.txt').st_size>0
-    assert os.stat('t/b/bb.txt').st_size>0
+    ps1 = os.stat('t/a/aa.txt').st_size
+    ps2 = os.stat('t/b/bb.txt').st_size
+    assert ps1 > 0
+    assert ps2 > 0
     v = '\n'.join(txdir.tree_to_view(with_content=False))
     txdir.view_to_tree(v.splitlines())
     assert os.path.exists('t/a/aa.txt')
     assert os.path.exists('t/b/bb.txt')
-    assert os.stat('t/a/aa.txt').st_size==0
-    assert os.stat('t/b/bb.txt').st_size==0
+    assert os.stat('t/a/aa.txt').st_size==ps1
+    assert os.stat('t/b/bb.txt').st_size==ps2
 
 def test_ascii(tmpworkdir):
     txdir.set_ascii()
@@ -513,7 +527,7 @@ def test_ascii(tmpworkdir):
 r/a/x.txt
    Text in x'''
     shutil.rmtree('r',ignore_errors=True)
-    t.create()
+    t.tree()
     t = txdir.TxDir.fromfs('r')
     assert t.view() == '''\
 `- a/

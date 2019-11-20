@@ -1,5 +1,5 @@
 =================================
-txdir(1) Version 1.1.1 \| txdir
+txdir(1) Version 2.0.0 \| txdir
 =================================
 
 NAME
@@ -28,40 +28,35 @@ Files/dirs are ignored via .gitignore.
 
 Command line help::
 
-    usage: txdir [infile] [outdir] [-h] [-v] [-l] [-f] [-d] [-n] [-m M] [-c [C [C ...]]]
 
-    Files/dirs are ignored via .gitignore. If the directory contains unignored
-    binary files, exclude files with '-f'. Ignoring content with '-n', then
-    reapplying will empty all files. NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY
-    ACCORDING FILES IN THE FILE TREE.
-    
+    usage: txdir  [infile] [outdir] [-h] [-v] [-a] [-b] [-l] [-f] [-d] [-n] [-m M] [-c [C [C ...]]]
+
+    Files/dirs are ignored via .gitignore. If the directory contains unignored binary files, exclude
+    files with '-f' or ignoring content with '-n'. Text file content must not have an empty first
+    line.
+
     positional arguments:
-      infile          If a file, it is expected to contain a text tree, flat or
-                      indented (none or - is stdin). If a directory, the text tree
-                      is created from the file tree (like the Linux tree tool).
-      outdir          None or - means printing the tree to stdout. If the
-                      parameter is an existing file, nothing is done. If not a
-                      directory, the directory is created. The file tree is
+      infile          If a file, it is expected to contain a text representation of a directory, flat
+                      or indented (none or - is stdin). If a directory, the text view is created with
+                      file content (unless -n).
+      outdir          None or - means printing to stdout. If the parameter is an existing file,
+                      nothing is done. If not a directory, the directory is created. The file tree is
                       created in the directory.
-    
+
     optional arguments:
       -h              Print help information.
       -v              Print version information.
-      -l              Create a flat listing instead of an indented text tree from
-                      file tree.
-      -a              Use ASCII instead of unicode when printing the indented text tree.
-      -f              Omit files. Just directories, when creating a text tree from
-                      a file tree.
-      -d              Include dot files/directories when creating a text tree from
-                      a file tree.
-      -n              Omit file content when creating a text tree from a file
-                      tree.
-      -m M            Maximum depth to scan when creating a text tree from a file
-                      tree.
-      -c [C [C ...]]  Directories described with a DSL (',' = end of token, '.' =
-                      up dir, '/' = down) `txdir - . -c 'a/b/d.c/d..a/u,v,x,g\.x'`
-                      produces the same as `mkdir -p a/{b,c}/d a/u a/v a/x a/g.x`
-                      If not within ', use \\ to escape.
+      -a              Use ASCII instead of unicode when printint the indented view.
+      -b              Include content of binary files as base64 encoded.
+      -l              Create a flat listing instead of an indented view.
+      -f              Omit files. Only list directories.
+      -d              Include dot files/directories.
+      -n              Omit file content.
+      -m M            Maximum directory depth to scan.
+      -c [C [C ...]]  Directories described with a DSL (',' = end of token, '.' = up dir, '/' = down)
+                      `txdir - . -c 'a/b/d.c/d..a/u,v,x,g\.x'` produces the same as `mkdir -p
+                      a/{b,c}/d a/u a/v a/x a/g.x` If not within ', use \\ to escape.
+
 
 DESCRIPTION
 ===========
@@ -127,12 +122,7 @@ This applies to the (edited) text tree in ``tmp.txt`` on the current directory.
 produces the same tree below ``again``, almost like a ``cp -R . again``.
 But internally a text tree of the file tree is created and then applied to the new location.
 
-``txdir`` **does not work for binary files**. If there are binary files, use ``-f`` to exclude files.
-Ignoring content with ``-n``, then reapplying, will empty all files.
-
-NOTE: EMPTY FILES IN TEXT TREE WILL EMPTY ACCORDING FILES IN THE FILE TREE.
-
-Note, also, that **text file content must not have an empty first line**.
+Note, that **text file content must not have an empty first line**.
 
 EXAMPLES
 --------
@@ -174,10 +164,10 @@ EXAMPLES
       ├─ a/
       │  ├─ x/
       │  │  └─ x.txt
-      │  │        This is content in x.txt
+                  This is content in x.txt
       │  ├─ y/
       │  │  └─ y.txt
-      │  │        This is content in y.txt
+                  This is content in y.txt
       │  └─ z/
       └─ tmp.txt
             ├─ a/
