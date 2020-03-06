@@ -855,7 +855,7 @@ def main(print=print,**args):
         parser.add_argument(
             "-a",
             action="store_true",
-            help="Use ASCII instead of unicode when printint the indented view.",
+            help="Use ASCII instead of unicode when printing the indented view.",
         )
         parser.add_argument(
             "-b",
