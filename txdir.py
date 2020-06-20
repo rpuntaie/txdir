@@ -14,7 +14,7 @@ from base64 import b64encode, b64decode
 import pathspec
 
 #also in README.rst
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 #see test_txdir.py to see how to change
 MID = '├'
@@ -841,7 +841,7 @@ def main(print=print,**args):
         parser = argparse.ArgumentParser(add_help=False,description='''\
         Files/dirs are ignored via .gitignore.
         If the directory contains unignored binary files,
-        exclude files with '-f' or ignoring content with '-n'.
+        exclude files with '-f'. Ignore content with '-n'.
         Text file content must not have an empty first line.
         '''
         )
