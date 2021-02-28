@@ -2,7 +2,6 @@
 
 from setuptools import setup
 import os
-from os.path import dirname
 import ast
 import re
 

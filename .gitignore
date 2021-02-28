@@ -8,3 +8,5 @@ build
 .tags
 
 .coverage
+
+.eggs
