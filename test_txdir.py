@@ -15,8 +15,7 @@ def run(x,**kwargs):
     else:
         return sprun(x,shell=False,**kwargs)
 
-module_path = os.path.join(os.path.dirname(__file__), "txdir.py")
-txdir = importlib.machinery.SourceFileLoader("txdir", module_path).load_module()
+import txdir
 fromview = txdir.TxDir.fromview
 fromcmds = txdir.TxDir.fromcmds
 
@@ -123,7 +122,7 @@ def test_cmd_v(u8):
     lns = r.stdout.decode('utf-8')
     assert 'txdir' in lns.strip()
 
-@pytest.yield_fixture
+@pytest.fixture
 def tmpworkdir(tmpdir):
     """
     Create a temporary working working directory.
@@ -146,7 +145,7 @@ def test_cmd_dir1(tmpworkdir,u8):
     assert os.path.exists('a')
     shutil.rmtree('a')
 
-@pytest.yield_fixture
+@pytest.fixture
 def b_with_a(tmpworkdir):
     r = sprun(f"echo a/ | "+txcmd+" "+Z+" - b",shell=True)
     assert r.returncode == 0
@@ -260,7 +259,7 @@ def test_dirtree_from_view3(tmpworkdir,u8):
     newv = txdir.tree_to_view('.')
     assert '\n'.join(newv) == v.rstrip()
 
-@pytest.yield_fixture
+@pytest.fixture
 def tree(tmpworkdir):
     lst = '''
 tmpt/a/aa.txt
