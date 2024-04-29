@@ -24,7 +24,7 @@ up:
 
 .PHONY: tag
 tag: dist
-	$(eval TAGMSG="v$(shell ./txdir -v | cut -d ' ' -f 2)")
+	$(eval TAGMSG="v$(shell python ./txdir.py -v | cut -d ' ' -f 2)")
 	echo $(TAGMSG)
 	git tag -s $(TAGMSG) -m"$(TAGMSG)"
 	git verify-tag $(TAGMSG)
