@@ -265,24 +265,33 @@ def tree(tmpworkdir):
 tmpt/a/aa.txt
     this is aa
 
+tmpt/a/.g.txt
+    this is g a
+
 tmpt/a/f.txt -> ../b/e/f.txt
 tmpt/a/u -> /tmpt/a
 tmpt/b/c/d/
 tmpt/b/k/e -> /tmpt/a
 tmpt/b/e/u/f.txt << http://docutils.sourceforge.net/docs/user/rst/quickstart.txt
 tmpt/b/.g.txt
-         this is g
+         this is g b
 
 '''.splitlines()
     txdir.flat_to_tree(lst)
     txdir.flat_to_tree(lst) #no exists already
-    f=txdir.tree_to_flat(maxdepth=3)
+    f=txdir.tree_to_flat(maxdepth=3,with_dot=True)
     assert '\n'.join(f)=='''\
+tmpt/a/.g.txt
+   this is g a
+
 tmpt/a/aa.txt
    this is aa
 
 tmpt/a/f.txt -> ../b/e/f.txt
 tmpt/a/u -> ../../tmpt/a
+tmpt/b/.g.txt
+   this is g b
+
 tmpt/b/c/
 tmpt/b/e/
 tmpt/b/k/'''
@@ -326,6 +335,9 @@ def test_withcontent(tree,u8):
     assert lns == '''\
 └─ tmpt/
    ├─ a/
+   │  ├─ .g.txt
+            this is g a
+
    │  ├─ aa.txt
             this is aa
 
@@ -333,8 +345,50 @@ def test_withcontent(tree,u8):
    │  └─ u -> ../../tmpt/a
    └─ b/
       ├─ .g.txt
-            this is g
+            this is g b
 
+      ├─ c/
+      │  └─ d/
+      ├─ e/
+      │  └─ u/
+      └─ k/
+         └─ e -> ../../../tmpt/a'''.replace('─',HOR).replace('└',END).replace('├',MID).replace('│',VER)
+def test_from_file_with_dot(tree,u8):
+    with open('inf.txt','w') as inf:
+        inf.write('''\
+└─ tmpt/
+   ├─ a/
+   │  ├─ aa.txt
+            this is aa
+
+   │  ├─ .g.txt
+            this is g a
+
+   │  ├─ f.txt -> ../b/e/f.txt
+   │  └─ u -> ../../tmpt/a
+   └─ b/
+      ├─ c/
+      │  └─ d/
+      ├─ .g.txt
+            this is g b
+
+      ├─ e/
+      │  └─ u/
+      └─ k/
+         └─ e -> ../../../tmpt/a''')
+    r = run([txcmd,'inf.txt','out'])
+    assert r.returncode == 0
+    assert open('tmpt/a/.g.txt').read()=='this is g a\n\n'
+    res = '\n'.join(txdir.tree_to_view('out',maxdepth=4))
+    assert res == '''\
+└─ tmpt/
+   ├─ a/
+   │  ├─ aa.txt
+            this is aa
+
+   │  ├─ f.txt -> ../b/e/f.txt
+   │  └─ u -> ../../tmpt/a
+   └─ b/
       ├─ c/
       │  └─ d/
       ├─ e/

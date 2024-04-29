@@ -14,7 +14,7 @@ from base64 import b64encode, b64decode
 import pathspec
 
 #also in README.rst
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 
 #see test_txdir.py to see how to change
 MID = '├'
@@ -290,8 +290,8 @@ def _rex():
     dwn = re.escape(DWN)
     lnkr = re.escape(LNKR)
     return argparse.Namespace(
-    _re_pth_plus = re.compile(r'^(\w[^ </\\]*)(\s*'+dwn+r'\s*|\s*[\\/]\s*|\s*'+lnkr+r'\s*)*([\w\.].*)*')
-    ,_re_lnk_pth_plus = re.compile(r'^(/?\w[^ </\\]*)(\s*'+dwn+r'\s*|\s*[\\/]\s*|\s*'+lnkr+r'\s*)*([\w\.].*)*') #for symlink
+    _re_pth_plus = re.compile(r'^([\w\.][^ </\\]*)(\s*'+dwn+r'\s*|\s*[\\/]\s*|\s*'+lnkr+r'\s*)*([\w\.].*)*')
+    ,_re_lnk_pth_plus = re.compile(r'^(/?[\w\.][^ </\\]*)(\s*'+dwn+r'\s*|\s*[\\/]\s*|\s*'+lnkr+r'\s*)*([\w\.].*)*') #for symlink
     ,_re_skip = re.compile(r'[^\s'+re.escape(MID+VER+END+HOR)+']')
     ,_re_skip_middle = re.compile(r'[^\s'+re.escape(VER)+']')
     ,_re_to_file = re.compile(r'['+re.escape(MID+END)+']')
@@ -621,7 +621,7 @@ class TxDir:
                     c = next(x for x in c.content if x.name==an)
                     continue
                 except:
-                    if an == '.': 
+                    if an == '.':
                         continue
                     elif an == '..':
                         c = c.parent
