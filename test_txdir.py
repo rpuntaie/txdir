@@ -1,11 +1,11 @@
 import sys
 import os
 import io
-import importlib.machinery
 import shutil
 from subprocess import run as sprun, PIPE
-from base64 import b64encode, b64decode
+from base64 import b64encode
 import pytest
+import txdir
 
 here = os.path.dirname(__file__)
 
@@ -15,7 +15,6 @@ def run(x,**kwargs):
     else:
         return sprun(x,shell=False,**kwargs)
 
-import txdir
 fromview = txdir.TxDir.fromview
 fromcmds = txdir.TxDir.fromcmds
 
@@ -34,7 +33,6 @@ def u8(request):
        HOR = '─'
        VER = '│'
        Z = ''
-       txcmd = f'{here}/txdir.py'
     else:
        Z = '-a'
        txdir.set_ascii()
@@ -44,20 +42,6 @@ def u8(request):
        HOR = "-"
 
 if 'win' in sys.platform:
-   ##Z = ''
-   #Z = '-a'
-   #txdir.set_tree_chars(
-   #     mid = r"`"
-   #     ,end = "`"
-   #     ,hor = "-"
-   #     ,ver = r"|"
-   #     ,mid_end =     ['`- ', '`- ']
-   #     ,sub_mid_end = ['|  ', '   ']
-   #)
-   #MID = r"`"
-   #END = "`"
-   #VER = "|"
-   #HOR = "-"
    txcmd = f'{here}\\txdir.py'
 else:
    #Z = ''
@@ -140,14 +124,14 @@ def test_cmd_file1(tmpworkdir,u8):
         shutil.rmtree('a')
 
 def test_cmd_dir1(tmpworkdir,u8):
-    r = sprun(f"echo a/ | "+txcmd+" "+Z+" - .",shell=True)
+    r = sprun("echo a/ | "+txcmd+" "+Z+" - .",shell=True)
     assert r.returncode == 0
     assert os.path.exists('a')
     shutil.rmtree('a')
 
 @pytest.fixture
 def b_with_a(tmpworkdir):
-    r = sprun(f"echo a/ | "+txcmd+" "+Z+" - b",shell=True)
+    r = sprun("echo a/ | "+txcmd+" "+Z+" - b",shell=True)
     assert r.returncode == 0
     assert os.path.exists('b/a')
     assert os.path.isdir('b/a')
@@ -299,7 +283,7 @@ tmpt/b/k/'''
 def test_flat1(tree,u8):
     d = txdir.TxDir.fromfs('tmpt')
     quick = d.cd('b/e/u/f.txt')
-    assert quick!=None
+    assert quick is not None
     assert quick.isfile()
     assert len(quick.content)>100
 
@@ -409,10 +393,10 @@ tmpt/b/g.txt
 
 '''
     d = txdir.TxDir.fromflat(lst)
-    assert d.cd('tmpt/b/c/d')!=None
-    assert d.cd('tmpt/b/c/../c')!=None
-    assert d.cd('tmpt/b/c/./d')!=None
-    assert d.cd(['tmpt','b'])!=None
+    assert d.cd('tmpt/b/c/d') is not None
+    assert d.cd('tmpt/b/c/../c') is not None
+    assert d.cd('tmpt/b/c/./d') is not None
+    assert d.cd(['tmpt','b']) is not None
     f = d.flat()
     assert f == '''\
 tmpt/a/aa.txt
@@ -430,7 +414,7 @@ tmpt/b/g.txt
 def test_mkdir(tmpworkdir,u8):
     if 'win' in sys.platform:
         return True
-    sprun(txcmd+" "+Z+fr" - . -c 'a/b/d.c/d..a/u,v,x,g\.x'",shell=True)
+    sprun(txcmd+" "+Z+r" - . -c 'a/b/d.c/d..a/u,v,x,g\.x'",shell=True)
     t1 = txdir.TxDir.fromfs('a')
     shutil.rmtree('a')
     sprun('mkdir -p a/{b,c}/d a/u a/v a/x a/g.x',shell=True)
@@ -494,14 +478,12 @@ def test_err2(tmpworkdir,capsys,u8):
     assert not os.path.exists('tmpt/a/b')
 
 def test_nobin(tmpworkdir,u8):
-    import random
     with open('tmp','wb') as f:
        f.write(b'\xff') #UnicodeDecodeError
     lns = '\n'.join(txdir.tree_to_view('.'))
     assert lns == "└─ tmp".replace('─',HOR).replace('└',END)
 
 def test_wbin(tmpworkdir,u8):
-    import random
     with open('tmp','wb') as f:
        f.write(b'\xff') #UnicodeDecodeError
     lns = '\n'.join(txdir.tree_to_view('.',with_binary=True))

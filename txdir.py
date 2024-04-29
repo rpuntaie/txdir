@@ -72,12 +72,12 @@ def set_utf8():
 
 
 #OS
-cwd = lambda: os.getcwd().replace('\\', '/')
+def cwd(): return os.getcwd().replace('\\', '/')
 cd = os.chdir
 mkdir = partial(os.makedirs, exist_ok=True)
-relpath = lambda x, start: os.path.relpath(x, start=start).replace('\\', '/')
-dirname = lambda x: os.path.dirname(x).replace('\\', '/')
-normjoin = lambda *x: os.path.normpath(os.path.join(*x)).replace("\\", "/")
+def relpath(x, start): return os.path.relpath(x, start=start).replace('\\', '/')
+def dirname(x): return os.path.dirname(x).replace('\\', '/')
+def normjoin(*x): return os.path.normpath(os.path.join(*x)).replace("\\", "/")
 basename = os.path.basename
 exists = os.path.exists
 isfile = os.path.isfile
@@ -188,7 +188,7 @@ def up_dir(match
             if len(rootres)==1 and 'win' in sys.platform: # pragma: no cover
                 rootres = ''
             return rootres
-        except:
+        except Exception:
             return None
     if not parent:
         return parent
@@ -263,7 +263,7 @@ def tree_to_view(rootpath = None
             if islink(pd):
                 try:
                     rlink = readlink(pd)
-                except: # pragma: no cover
+                except Exception: # pragma: no cover
                     rlink = ''
                 yield padding + dn + ' ' + LNKR + ' ' + rlink
             elif isdir(pd):
@@ -335,7 +335,7 @@ def view_to_tree(view_str_list
         try:
             ct = _r._re_skip.search(t).span()[0]
             break
-        except:
+        except Exception:
             continue
     sublst = [t[ct:].rstrip() for t in view_str_list[treestart:]]
     isublst = list(rindices(_r._re_lnk_pth_plus, sublst))
@@ -344,23 +344,25 @@ def view_to_tree(view_str_list
         file_entry = sublst[strt]
         try:
             efile, delim, url = _r._re_pth_plus.match(file_entry).groups()
-        except: #/symlink/rel/to/root <- name
+        except Exception: #/symlink/rel/to/root <- name
             lnk = fullpthroot+file_entry
             lndst = basename(lnk)
             try:
                 _,lndst = lndst.split(LNKL)
                 lnk,_ = lnk.split(LNKL)
-            except: pass
+            except Exception:
+                pass
             try:
                 lnk = relpath(lnk.strip().strip('/'),pwd.strip('/'))
                 symlink(lnk,lndst.strip())
-            except: pass
+            except Exception:
+                pass
             continue
         if efile:
             if strt < last - 1:
                 nxtline = sublst[strt + 1]
                 try:
-                    ix = _r._re_to_file.search(nxtline).span()[0]
+                    _ = _r._re_to_file.search(nxtline).span()[0]
                     # file name starter found
                     mkdir(efile)
                     with withcwd(efile):
@@ -373,12 +375,12 @@ def view_to_tree(view_str_list
                                      ,filewrite=filewrite
                                      ,eprint=eprint
                                      )
-                except:# .. else file content
+                except Exception:# .. else file content
                     cntent = sublst[strt + 1:last]
                     ct = 0
                     try:
                         ct = _r._re_skip_middle.search(cntent[0]).span()[0]
-                    except:
+                    except Exception:
                         eprint(strt, last, '\n'.join(cntent[:10]))
                         eprint("FIRST LINE OF FILE CONTENT MUST NOT BE EMPTY!")
                     cntlns = [t[ct:] + '\n' for t in cntent]
@@ -389,7 +391,8 @@ def view_to_tree(view_str_list
                 elif LNKR in delim and url and efile: #name -> ../rel/to/here
                     try:
                         symlink(url,efile)
-                    except: pass
+                    except Exception:
+                        pass
                 elif DWN in delim:
                     urlretrieve(url, efile,filewrite=filewrite,eprint=eprint)
             else:
@@ -447,7 +450,7 @@ def tree_to_flat(rootpath = None
             if islink(pd):
                 try:
                     rlink = readlink(pd)
-                except: # pragma: no cover
+                except Exception: # pragma: no cover
                     rlink = ''
                 yield thispth + ' ' + LNKR + ' ' + rlink
             elif isdir(pd):
@@ -506,17 +509,20 @@ def flat_to_tree(flat_str_list
             if tgt.startswith('/'):
                 tgt = '../'*(len(fnm.split('/'))-1)+tgt[1:]
             dfnm = dirname(fnm)
-            if dfnm: mkdir(dfnm)
+            if dfnm:
+                mkdir(dfnm)
             try:
                 symlink(tgt,fnm)
-            except: pass
+            except Exception:
+                pass
         elif len(usplit) == 2:
             urlretrieve(usplit[1], usplit[0], filewrite=filewrite,eprint=eprint)
         elif e.endswith('/'):
             mkdir(e)
         else:
             de = dirname(e)
-            if de: mkdir(de)
+            if de:
+                mkdir(de)
             indent,fllns = 0,[]
             try:
                 j = i
@@ -530,7 +536,8 @@ def flat_to_tree(flat_str_list
                 ln0 = fllns[0]
                 indent = _r._re_space.search(ln0).span()[0]
                 i = j
-            except: pass
+            except Exception:
+                pass
             flcntlns = [x[indent:]+'\n' for x in fllns]
             if flcntlns or not exists(e):
                 fileput(e,flcntlns,filewrite=filewrite)
@@ -612,7 +619,7 @@ class TxDir:
         c = self
         try:
             apath = [x for x in apath.split('/') if x]
-        except:
+        except Exception:
             pass
         maxi = len(apath)-1
         for i,an in enumerate(apath):
@@ -620,7 +627,7 @@ class TxDir:
                 try:
                     c = next(x for x in c.content if x.name==an)
                     continue
-                except:
+                except Exception:
                     if an == '.':
                         continue
                     elif an == '..':
@@ -692,7 +699,7 @@ class TxDir:
                     if current.parent:
                         current = current.parent
                 else:
-                    node = TxDir(token, parent=current)
+                    _ = TxDir(token, parent=current)
         return root
 
     @staticmethod
@@ -817,7 +824,8 @@ class TxDir:
                 mkdir(dirname(e.path()))
                 try:
                     symlink(e.content,e.path())
-                except: pass
+                except Exception:
+                    pass
             elif e.isdir():
                 lastdir = e.path()
                 mkdir(lastdir)
@@ -941,7 +949,7 @@ def main(print=print,**args):
         sys.stdin = codecs.getreader("utf-8")(sys.stdin.detach())
         sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
         sys.stderr = codecs.getreader("utf-8")(sys.stderr.detach())
-    except:
+    except Exception:
         pass
     fview = []
     inf = isfile(infile)
@@ -971,13 +979,17 @@ def main(print=print,**args):
     outf = isfile(outdir)
     if not outf:
         if outdir == '-':
-            if tx: print(tx.flat()) if args.l else print(tx.view())
-            if fview: print('\n'.join(fview))
+            if tx:
+                print(tx.flat()) if args.l else print(tx.view())
+            if fview:
+                print('\n'.join(fview))
         else: #dir
             mkdir(outdir)
             with with_cwd(outdir):
-                if tx: tx.tree()
-                if fview: to_tree(fview)
+                if tx:
+                    tx.tree()
+                if fview:
+                    to_tree(fview)
     return 0
 
 
